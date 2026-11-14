@@ -27,6 +27,7 @@ label{font-size:12px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .foodresult{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
 .foodresult button{padding:7px 10px;font-size:12px}
 .statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat{background:#f5f8f9;border-radius:12px;padding:12px}.stat strong{font-size:21px;display:block}
+.measurement-detail summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
 .notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
 canvas{width:100%;height:210px}.chart-ranges button{font-size:12px;padding:9px 8px}.chart-ranges button.active{background:var(--navy);color:#fff}
 </style>
@@ -95,18 +96,6 @@ canvas{width:100%;height:210px}.chart-ranges button{font-size:12px;padding:9px 8
   <div class="formgrid"><div><label>体重（kg）</label><input id="measureWeight" type="number" step=".1" placeholder="65.6"></div><div><label>体脂肪率（%）</label><input id="bodyFat" type="number" step=".1" placeholder="任意"></div><div><label>筋肉量（kg）</label><input id="muscleMass" type="number" step=".1" placeholder="任意"></div><div><label>ウエスト（cm）</label><input id="waist" type="number" step=".1" placeholder="任意"></div></div>
   <button style="width:100%" onclick="addMeasurement()">測定値を保存</button>
  </div>
- <h2>体重の推移</h2>
-  <div class="card">
-   <div class="actions chart-ranges" style="margin-bottom:10px">
-    <button type="button" class="secondary" data-range="7" onclick="setChartRange(7)">1週間</button>
-    <button type="button" class="secondary" data-range="30" onclick="setChartRange(30)">1か月</button>
-    <button type="button" class="secondary" data-range="90" onclick="setChartRange(90)">3か月</button>
-    <button type="button" class="secondary" data-range="all" onclick="setChartRange('all')">全期間</button>
-   </div>
-   <canvas id="weightChart" width="600" height="260"></canvas>
-   <div class="small" id="chartCaption">数値ラベルを省略し、体重の推移を表示します。</div>
-  </div>
- <h2>測定履歴</h2><div class="card" id="measurementHistory"></div>
  <h2>目標設定</h2>
  <div class="card">
   <h3>ボディメイク目標</h3>
@@ -121,6 +110,19 @@ canvas{width:100%;height:210px}.chart-ranges button{font-size:12px;padding:9px 8
   <label>タンパク質目標（g）</label><input id="proteinGoalInput" type="number" min="1" step="1" value="100">
   <button class="secondary" style="width:100%" onclick="saveGoals()">目標を保存</button>
   <div class="small" style="margin-top:9px">未設定の項目は空欄のままで構いません。目標はこのスマホ内に保存されます。</div>
+ <h2>体重の推移</h2>
+  <div class="card">
+   <div class="actions chart-ranges" style="margin-bottom:10px">
+    <button type="button" class="secondary" data-range="7" onclick="setChartRange(7)">1週間</button>
+    <button type="button" class="secondary" data-range="30" onclick="setChartRange(30)">1か月</button>
+    <button type="button" class="secondary" data-range="90" onclick="setChartRange(90)">3か月</button>
+    <button type="button" class="secondary" data-range="all" onclick="setChartRange('all')">全期間</button>
+   </div>
+   <canvas id="weightChart" width="600" height="260"></canvas>
+   <div class="small" id="chartCaption">数値ラベルを省略し、体重の推移を表示します。</div>
+  </div>
+ <h2>測定履歴</h2><div class="card" id="measurementHistory"></div>
+
  </div>
 </section>
 <section id="settings" class="page hidden">
@@ -179,7 +181,7 @@ function saveGoals(){
  saveDB();renderAll();alert('目標を保存しました')
 }
 function delItem(arr,id){if(confirm('この記録を削除しますか？')){db[arr]=db[arr].filter(x=>x.id!==id);saveDB();renderAll()}}
-function renderAll(){let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('measurementHistory').innerHTML=ms.length?ms.map(x=>`<div class="item row"><div><b>${x.date}　${fmt(x.w)}kg</b><div class="small">${x.fat==null?'':'体脂肪 '+fmt(x.fat)+'%　'}${x.muscle==null?'':'筋肉量 '+fmt(x.muscle)+'kg　'}${x.waist==null?'':'腹囲 '+fmt(x.waist)+'cm'}</div></div><button class="danger" onclick="delItem('measurements','${x.id}')">削除</button></div>`).join(''):'<div class="empty">測定記録はまだありません</div>';document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';document.getElementById('dailyNote').value=db.notes[today()]||'';document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';drawChart(ms)}
+function renderAll(){let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('measurementHistory').innerHTML=ms.length?ms.map(x=>`<details class="measurement-detail item"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(x.date)}　${fmt(x.w)}kg</b></span><span class="small">詳細を見る　▾</span></summary><div style="padding:10px 4px 2px"><div class="small">体重：${fmt(x.w)}kg</div><div class="small">体脂肪率：${x.fat==null?'未記録':fmt(x.fat)+'%'}</div><div class="small">筋肉量：${x.muscle==null?'未記録':fmt(x.muscle)+'kg'}</div><div class="small">ウエスト：${x.waist==null?'未記録':fmt(x.waist)+'cm'}</div><button class="danger" style="margin-top:8px" onclick="delItem('measurements','${x.id}')">この記録を削除</button></div></details>`).join(''):'<div class="empty">測定記録はまだありません</div>';document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';document.getElementById('dailyNote').value=db.notes[today()]||'';document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';drawChart(ms)}
 function setChartRange(range){
  chartRange=range;
  document.querySelectorAll('.chart-ranges button').forEach(b=>b.classList.toggle('active',String(b.dataset.range)===String(range)));
