@@ -28,7 +28,7 @@ label{font-size:12px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .foodresult button{padding:7px 10px;font-size:12px}
 .statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat{background:#f5f8f9;border-radius:12px;padding:12px}.stat strong{font-size:21px;display:block}
 .notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
-canvas{width:100%;height:190px}
+canvas{width:100%;height:210px}.chart-ranges button{font-size:12px;padding:9px 8px}.chart-ranges button.active{background:var(--navy);color:#fff}
 </style>
 </head>
 <body>
@@ -95,7 +95,17 @@ canvas{width:100%;height:190px}
   <div class="formgrid"><div><label>体重（kg）</label><input id="measureWeight" type="number" step=".1" placeholder="65.6"></div><div><label>体脂肪率（%）</label><input id="bodyFat" type="number" step=".1" placeholder="任意"></div><div><label>筋肉量（kg）</label><input id="muscleMass" type="number" step=".1" placeholder="任意"></div><div><label>ウエスト（cm）</label><input id="waist" type="number" step=".1" placeholder="任意"></div></div>
   <button style="width:100%" onclick="addMeasurement()">測定値を保存</button>
  </div>
- <h2>体重の推移</h2><div class="card"><canvas id="weightChart" width="600" height="240"></canvas><div class="small">記録した測定値を日付順に表示します。</div></div>
+ <h2>体重の推移</h2>
+  <div class="card">
+   <div class="actions chart-ranges" style="margin-bottom:10px">
+    <button type="button" class="secondary" data-range="7" onclick="setChartRange(7)">1週間</button>
+    <button type="button" class="secondary" data-range="30" onclick="setChartRange(30)">1か月</button>
+    <button type="button" class="secondary" data-range="90" onclick="setChartRange(90)">3か月</button>
+    <button type="button" class="secondary" data-range="all" onclick="setChartRange('all')">全期間</button>
+   </div>
+   <canvas id="weightChart" width="600" height="260"></canvas>
+   <div class="small" id="chartCaption">数値ラベルを省略し、体重の推移を表示します。</div>
+  </div>
  <h2>測定履歴</h2><div class="card" id="measurementHistory"></div>
  <h2>目標設定</h2><div class="card"><label>1日のカロリー目標（kcal）</label><input id="goalInput" type="number" value="2100"><label>タンパク質目標（g）</label><input id="proteinGoalInput" type="number" value="100"><button class="secondary" onclick="saveGoals()">目標を保存</button></div>
 </section>
@@ -126,7 +136,7 @@ const seedFoods=[
 ['しめじ',26,2.7,.5,4.8],['さつまいも（蒸し）',131,1.2,.2,31.9],['バナナ',93,1.1,.2,22.5],['りんご',56,.2,.3,16.2],
 ['アーモンド',609,19.6,51.8,20.9],['オートミール',350,13.7,5.7,69.1]
 ].map((x,i)=>({id:'s'+i,name:x[0],base:100,kcal:x[1],p:x[2],f:x[3],c:x[4],custom:false}));
-let db=loadDB(), selected=null;
+let db=loadDB(), selected=null, chartRange=90;
 function loadDB(){try{return JSON.parse(localStorage.getItem(KEY))||{meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}catch(e){return {meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}}
 function saveDB(){localStorage.setItem(KEY,JSON.stringify(db))}
 function today(){return new Date().toLocaleDateString('sv-SE')}
@@ -148,12 +158,56 @@ function saveNote(){db.notes[today()]=document.getElementById('dailyNote').value
 function saveGoals(){db.goals={kcal:Number(document.getElementById('goalInput').value)||2100,p:Number(document.getElementById('proteinGoalInput').value)||100};saveDB();renderAll();alert('目標を保存しました')}
 function delItem(arr,id){if(confirm('この記録を削除しますか？')){db[arr]=db[arr].filter(x=>x.id!==id);saveDB();renderAll()}}
 function renderAll(){let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('measurementHistory').innerHTML=ms.length?ms.map(x=>`<div class="item row"><div><b>${x.date}　${fmt(x.w)}kg</b><div class="small">${x.fat==null?'':'体脂肪 '+fmt(x.fat)+'%　'}${x.muscle==null?'':'筋肉量 '+fmt(x.muscle)+'kg　'}${x.waist==null?'':'腹囲 '+fmt(x.waist)+'cm'}</div></div><button class="danger" onclick="delItem('measurements','${x.id}')">削除</button></div>`).join(''):'<div class="empty">測定記録はまだありません</div>';document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('dailyNote').value=db.notes[today()]||'';document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';drawChart(ms)}
-function drawChart(ms){let cv=document.getElementById('weightChart');if(!cv)return;let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);let data=[...ms].reverse();if(!data.length){ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',30,120);return}let vals=data.map(x=>x.w),min=Math.min(...vals)-.5,max=Math.max(...vals)+.5;if(max===min)max=min+1;ctx.strokeStyle='#e3e9ed';ctx.lineWidth=1;for(let i=0;i<5;i++){let y=20+i*(h-55)/4;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-15,y);ctx.stroke()}ctx.strokeStyle='#239875';ctx.lineWidth=4;ctx.beginPath();data.forEach((x,i)=>{let px=45+(data.length===1?0:i*(w-80)/(data.length-1)),py=20+(max-x.w)*(h-55)/(max-min);i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();data.forEach((x,i)=>{let px=45+(data.length===1?0:i*(w-80)/(data.length-1)),py=20+(max-x.w)*(h-55)/(max-min);ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17232d';ctx.font='12px sans-serif';ctx.fillText(fmt(x.w),px-12,py-10)});}
+function setChartRange(range){
+ chartRange=range;
+ document.querySelectorAll('.chart-ranges button').forEach(b=>b.classList.toggle('active',String(b.dataset.range)===String(range)));
+ drawChart([...db.measurements].sort((a,b)=>a.date.localeCompare(b.date)));
+}
+function dateValue(s){
+ const m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+ return m?Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])):NaN;
+}
+function drawChart(ms){
+ let cv=document.getElementById('weightChart');if(!cv)return;
+ let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+ ctx.clearRect(0,0,w,h);
+ let data=[...ms].filter(x=>Number.isFinite(Number(x.w))&&Number.isFinite(dateValue(x.date))).sort((a,b)=>dateValue(a.date)-dateValue(b.date));
+ if(!data.length){
+  ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',30,130);
+  document.getElementById('chartCaption').textContent='測定データはまだありません。';return;
+ }
+ let end=dateValue(data[data.length-1].date), start=chartRange==='all'?dateValue(data[0].date):end-Number(chartRange)*86400000;
+ if(chartRange!=='all')data=data.filter(x=>dateValue(x.date)>=start&&dateValue(x.date)<=end);
+ if(!data.length){ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('この期間の測定データはありません',30,130);return;}
+ let vals=data.map(x=>Number(x.w)),min=Math.floor((Math.min(...vals)-.3)*2)/2,max=Math.ceil((Math.max(...vals)+.3)*2)/2;
+ if(max<=min)max=min+1;
+ const left=62,right=w-18,top=18,bottom=h-42,plotW=right-left,plotH=bottom-top;
+ ctx.font='12px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillStyle='#687782';ctx.strokeStyle='#e3e9ed';ctx.lineWidth=1;
+ for(let i=0;i<5;i++){
+  let v=max-i*(max-min)/4,y=top+i*plotH/4;
+  ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();
+  ctx.fillText(v.toFixed(1),left-9,y);
+ }
+ const first=dateValue(data[0].date),last=dateValue(data[data.length-1].date),span=Math.max(1,last-first);
+ const xOf=x=>left+(dateValue(x.date)-first)/span*plotW;
+ const yOf=x=>top+(max-Number(x.w))/(max-min)*plotH;
+ ctx.strokeStyle='#239875';ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
+ data.forEach((x,i)=>{let px=xOf(x),py=yOf(x);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
+ ctx.stroke();
+ data.forEach(x=>{ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(xOf(x),yOf(x),3,0,Math.PI*2);ctx.fill();});
+ ctx.fillStyle='#687782';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='11px sans-serif';
+ const label=s=>{let d=new Date(dateValue(s));return `${d.getUTCMonth()+1}/${d.getUTCDate()}`;};
+ const labels=[data[0].date,data[Math.floor((data.length-1)/2)].date,data[data.length-1].date];
+ const positions=[left,(left+right)/2,right];
+ labels.forEach((s,i)=>ctx.fillText(label(s),positions[i],bottom+10));
+ const period=chartRange==='all'?'全期間':chartRange===7?'直近1週間':chartRange===30?'直近1か月':'直近3か月';
+ document.getElementById('chartCaption').textContent=`${period}・${data.length}件の測定値。数値ラベルを省略して表示しています。`;
+}
 function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bodylog-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
 function importData(e){let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!d.meals||!d.trainings||!d.measurements)throw Error();if(confirm('現在のデータを読み込んだバックアップで置き換えますか？')){db=d;saveDB();renderAll();alert('復元しました')}}catch(err){alert('バックアップファイルを読み込めませんでした')}};r.readAsText(file);e.target.value=''}
 function clearData(){if(confirm('本当にすべての記録を削除しますか？')){localStorage.removeItem(KEY);db=loadDB();renderAll();renderFoodSearch()}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-renderFoodSearch();renderAll();
+renderFoodSearch();renderAll();setChartRange(90);
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
 <script src="./weightfit-import.js"></script>
