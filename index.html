@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#183247">
+<link rel="manifest" href="manifest.json">
+<title>BodyLog</title>
+<style>
+:root{--navy:#183247;--bg:#f3f6f8;--card:#fff;--ink:#17232d;--muted:#687782;--line:#e3e9ed;--green:#239875;--orange:#e2a33b;--blue:#4788c7}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;padding-bottom:82px}
+header{background:var(--navy);color:#fff;padding:18px 18px 20px;border-radius:0 0 22px 22px}
+.headrow{display:flex;justify-content:space-between;align-items:center}.brand{font-size:22px;font-weight:800;letter-spacing:.3px}.date{font-size:12px;color:#d5e1e8}
+main{max-width:680px;margin:auto;padding:14px}
+h2{font-size:17px;margin:18px 2px 10px}h3{font-size:14px;margin:0 0 10px}
+.card{background:var(--card);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:0 2px 9px #1d35450b}
+.kcal{font-size:32px;font-weight:800;margin:4px 0}.muted{color:var(--muted);font-size:12px}
+.progress{height:8px;background:#e9eef1;border-radius:8px;overflow:hidden;margin:8px 0 12px}.progress span{display:block;height:100%;background:var(--green);width:0}
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.macro{background:#f4f7f8;border-radius:12px;padding:10px}.macro b{display:block;font-size:18px;margin-top:3px}.p{color:var(--green)}.f{color:var(--orange)}.c{color:var(--blue)}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:8px 3px calc(8px + env(safe-area-inset-bottom));z-index:5}.tab{border:0;background:none;color:var(--muted);font-size:11px;padding:4px 0}.tab span{display:block;font-size:20px;margin-bottom:2px}.tab.active{color:var(--green);font-weight:700}
+button,.btn{border:0;border-radius:11px;padding:11px 13px;background:var(--navy);color:white;font-weight:650;font-size:14px;cursor:pointer}.btn.secondary,button.secondary{background:#edf2f4;color:var(--ink)}button.danger{background:#fff0ef;color:#b33b32}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1}
+input,select{width:100%;border:1px solid #dce4e8;border-radius:10px;padding:11px;font-size:15px;background:#fff;color:var(--ink);margin:5px 0 10px}
+label{font-size:12px;color:var(--muted);font-weight:650}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.item{padding:11px 0;border-bottom:1px solid var(--line)}.item:last-child{border:0}.small{font-size:12px;color:var(--muted)}
+.pill{font-size:11px;background:#edf4f2;color:#28765f;padding:4px 8px;border-radius:99px}
+.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:20px 5px;font-size:13px}
+.foodresult{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
+.foodresult button{padding:7px 10px;font-size:12px}
+.statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat{background:#f5f8f9;border-radius:12px;padding:12px}.stat strong{font-size:21px;display:block}
+.notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
+canvas{width:100%;height:190px}
+</style>
+</head>
+<body>
+<header><div class="headrow"><div class="brand">BodyLog</div><div class="date" id="today"></div></div><div style="margin-top:14px;font-size:12px;color:#d5e1e8">今日のボディメイク</div><div style="font-size:25px;font-weight:750;margin-top:3px">食事とトレーニングを記録</div></header>
+<main>
+<section id="home" class="page">
+ <div class="card">
+  <div class="row"><h3>今日の摂取カロリー</h3><span class="pill">目標 <span id="goalKcal">2100</span> kcal</span></div>
+  <div class="kcal"><span id="sumKcal">0</span><span style="font-size:14px;font-weight:500"> kcal</span></div>
+  <div class="progress"><span id="kcalBar"></span></div>
+  <div class="macros">
+   <div class="macro"><span class="small p">タンパク質</span><b><span id="sumP">0</span>g</b><span class="small">目標100g</span></div>
+   <div class="macro"><span class="small f">脂質</span><b><span id="sumF">0</span>g</b><span class="small">合計</span></div>
+   <div class="macro"><span class="small c">炭水化物</span><b><span id="sumC">0</span>g</b><span class="small">合計</span></div>
+  </div>
+ </div>
+ <div class="statgrid">
+  <div class="card stat"><span class="small">今朝の体重</span><strong id="latestWeight">未記録</strong><span class="small">kg</span></div>
+  <div class="card stat"><span class="small">今日の筋トレ</span><strong id="todaySets">0</strong><span class="small">セット</span></div>
+ </div>
+ <h2>今日の食事</h2><div class="card" id="todayMeals"></div>
+ <div class="actions"><button onclick="showPage('food')">＋ 食事を記録</button><button class="secondary" onclick="showPage('training')">筋トレを記録</button></div>
+ <h2>今日のメモ</h2><div class="card"><div class="small">食事・運動の気づきを残せます</div><input id="dailyNote" placeholder="例：脚に筋肉痛あり" /><button class="secondary" onclick="saveNote()">メモを保存</button></div>
+</section>
+<section id="food" class="page hidden">
+ <h2>食事を記録</h2>
+ <div class="card">
+  <label>食事区分</label><select id="mealType"><option>朝食</option><option>昼食</option><option>夕食</option><option>間食</option></select>
+  <label>食品を検索</label><input id="foodSearch" placeholder="例：ご飯、鮭、卵" oninput="renderFoodSearch()">
+  <div id="foodResults"></div>
+  <div class="notice">食品データは一般的な目安値です。商品・調理法・水分量で変わります。パッケージ表示や実測値を優先してください。</div>
+ </div>
+ <div class="card">
+  <h3>選択した食品</h3><div id="selectedFood" class="empty">食品を検索して選択してください</div>
+  <label>重量（g）</label><input id="foodGrams" type="number" min="0" value="100">
+  <div class="small" id="foodPreview">栄養値の目安がここに表示されます</div>
+  <button style="width:100%;margin-top:12px" onclick="addMeal()">この内容を食事に追加</button>
+ </div>
+ <div class="card">
+  <h3>食品を手動登録</h3>
+  <div class="formgrid"><div><label>食品名</label><input id="customName" placeholder="食品名"></div><div><label>基準量（g）</label><input id="customBase" type="number" value="100"></div>
+  <div><label>kcal</label><input id="customKcal" type="number" step=".1"></div><div><label>タンパク質（g）</label><input id="customP" type="number" step=".1"></div>
+  <div><label>脂質（g）</label><input id="customF" type="number" step=".1"></div><div><label>炭水化物（g）</label><input id="customC" type="number" step=".1"></div></div>
+  <button class="secondary" style="width:100%" onclick="saveCustomFood()">マイ食品に登録</button>
+ </div>
+ <h2>今日の食事履歴</h2><div class="card" id="mealHistory"></div>
+</section>
+<section id="training" class="page hidden">
+ <h2>筋トレを記録</h2>
+ <div class="card">
+  <label>トレーニング日</label><input id="trainingDate" type="date">
+  <label>部位</label><select id="bodyPart"><option>胸</option><option>背中</option><option>肩</option><option>腕</option><option>脚</option><option>腹筋</option><option>全身</option></select>
+  <label>種目</label><input id="exercise" list="exerciseList" placeholder="例：ダンベルプレス">
+  <datalist id="exerciseList"><option>ダンベルプレス</option><option>フロアプレス</option><option>腕立て伏せ</option><option>ワンハンドロー</option><option>ダンベルロー</option><option>ショルダープレス</option><option>サイドレイズ</option><option>アームカール</option><option>ハンマーカール</option><option>ゴブレットスクワット</option><option>ランジ</option><option>クランチ</option></datalist>
+  <div class="formgrid"><div><label>重量（kg）</label><input id="weightKg" type="number" min="0" step=".5" placeholder="例：10"></div><div><label>回数（回）</label><input id="reps" type="number" min="1" placeholder="例：10"></div><div><label>セット数</label><input id="sets" type="number" min="1" value="3"></div><div><label>メモ</label><input id="trainingMemo" placeholder="フォームなど"></div></div>
+  <button style="width:100%" onclick="addTraining()">トレーニングを保存</button>
+ </div>
+ <h2>トレーニング履歴</h2><div class="card" id="trainingHistory"></div>
+</section>
+<section id="analysis" class="page hidden">
+ <h2>体重・体組成を記録</h2>
+ <div class="card">
+  <label>測定日</label><input id="measureDate" type="date">
+  <div class="formgrid"><div><label>体重（kg）</label><input id="measureWeight" type="number" step=".1" placeholder="65.6"></div><div><label>体脂肪率（%）</label><input id="bodyFat" type="number" step=".1" placeholder="任意"></div><div><label>筋肉量（kg）</label><input id="muscleMass" type="number" step=".1" placeholder="任意"></div><div><label>ウエスト（cm）</label><input id="waist" type="number" step=".1" placeholder="任意"></div></div>
+  <button style="width:100%" onclick="addMeasurement()">測定値を保存</button>
+ </div>
+ <h2>体重の推移</h2><div class="card"><canvas id="weightChart" width="600" height="240"></canvas><div class="small">記録した測定値を日付順に表示します。</div></div>
+ <h2>測定履歴</h2><div class="card" id="measurementHistory"></div>
+ <h2>目標設定</h2><div class="card"><label>1日のカロリー目標（kcal）</label><input id="goalInput" type="number" value="2100"><label>タンパク質目標（g）</label><input id="proteinGoalInput" type="number" value="100"><button class="secondary" onclick="saveGoals()">目標を保存</button></div>
+</section>
+<section id="settings" class="page hidden">
+ <h2>設定・データ管理</h2>
+ <div class="card"><h3>データのバックアップ</h3><p class="small">記録はこのスマホのブラウザ内に保存されます。ブラウザのデータ消去や端末変更で失われる場合があるため、定期的にバックアップしてください。</p><div class="actions"><button onclick="exportData()">バックアップを書き出す</button><button class="secondary" onclick="document.getElementById('importFile').click()">復元する</button></div><input id="importFile" class="hidden" type="file" accept="application/json" onchange="importData(event)"></div>
+ <div class="card"><h3>マイ食品</h3><div id="customFoodList"></div></div>
+ <div class="card"><h3>データ削除</h3><p class="small">すべての記録を削除します。バックアップ後に実行してください。</p><button class="danger" onclick="clearData()">全データを削除</button></div>
+ <div class="notice">BodyLog試作版：食品栄養値は参考値です。医療・栄養指導の代替ではありません。</div>
+</section>
+</main>
+<nav class="tabs">
+ <button class="tab active" data-page="home" onclick="showPage('home')"><span>⌂</span>ホーム</button>
+ <button class="tab" data-page="food" onclick="showPage('food')"><span>🍽</span>食事</button>
+ <button class="tab" data-page="training" onclick="showPage('training')"><span>🏋</span>筋トレ</button>
+ <button class="tab" data-page="analysis" onclick="showPage('analysis')"><span>▥</span>分析</button>
+ <button class="tab" data-page="settings" onclick="showPage('settings')"><span>⚙</span>設定</button>
+</nav>
+<script>
+const KEY='bodylog-v1';
+const seedFoods=[
+['白ご飯（炊飯後）',156,2.5,.3,37.1],['玄米ご飯（炊飯後）',152,2.8,1,35.6],['食パン',248,8.9,4.1,46.4],
+['鶏むね肉（皮なし・生）',105,23.3,1.9,0],['鶏もも肉（皮なし・生）',113,19,5,0],['豚もも肉（赤身・生）',119,22.1,3.6,0],
+['牛もも肉（赤身・生）',140,21.3,6.1,.5],['鮭（生）',124,22.3,4.1,.1],['さば（生）',211,20.6,16.8,.3],
+['卵',142,12.2,10.2,.4],['納豆',184,16.5,10,12.1],['木綿豆腐',73,7,4.9,1.5],['絹ごし豆腐',56,5.3,3.5,2],
+['牛乳',61,3.3,3.8,4.8],['ヨーグルト（無糖）',56,3.6,3,4.9],['プロテイン（一般的な目安）',400,75,7,10],
+['ブロッコリー（ゆで）',30,3.9,.4,5.2],['キャベツ',23,1.3,.2,5.2],['白菜',13,.8,.1,3.2],['玉ねぎ',33,1, .1,8.4],
+['しめじ',26,2.7,.5,4.8],['さつまいも（蒸し）',131,1.2,.2,31.9],['バナナ',93,1.1,.2,22.5],['りんご',56,.2,.3,16.2],
+['アーモンド',609,19.6,51.8,20.9],['オートミール',350,13.7,5.7,69.1]
+].map((x,i)=>({id:'s'+i,name:x[0],base:100,kcal:x[1],p:x[2],f:x[3],c:x[4],custom:false}));
+let db=loadDB(), selected=null;
+function loadDB(){try{return JSON.parse(localStorage.getItem(KEY))||{meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}catch(e){return {meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}}
+function saveDB(){localStorage.setItem(KEY,JSON.stringify(db))}
+function today(){return new Date().toLocaleDateString('sv-SE')}
+function fmt(n){return (Math.round((Number(n)||0)*10)/10).toString()}
+document.getElementById('today').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
+document.getElementById('trainingDate').value=today();document.getElementById('measureDate').value=today();
+function showPage(p){document.querySelectorAll('.page').forEach(x=>x.classList.add('hidden'));document.getElementById(p).classList.remove('hidden');document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.page===p));renderAll();window.scrollTo(0,0)}
+function foods(){return [...seedFoods,...db.customFoods]}
+function renderFoodSearch(){let q=document.getElementById('foodSearch').value.trim().toLowerCase();let list=foods().filter(f=>f.name.toLowerCase().includes(q)).slice(0,18);document.getElementById('foodResults').innerHTML=list.map(f=>`<div class="foodresult"><div><b>${esc(f.name)}</b><div class="small">${fmt(f.kcal)} kcal / 100g　P${fmt(f.p)} F${fmt(f.f)} C${fmt(f.c)}</div></div><button onclick="selectFood('${f.id}')">選択</button></div>`).join('')||'<div class="empty">該当する食品がありません。マイ食品に登録できます。</div>'}
+function selectFood(id){selected=foods().find(f=>f.id===id);document.getElementById('selectedFood').textContent=selected.name;previewFood()}
+function previewFood(){if(!selected)return;let g=Number(document.getElementById('foodGrams').value)||0;document.getElementById('foodPreview').textContent=`約 ${fmt(selected.kcal*g/100)} kcal　P ${fmt(selected.p*g/100)}g / F ${fmt(selected.f*g/100)}g / C ${fmt(selected.c*g/100)}g`}
+document.getElementById('foodGrams').addEventListener('input',previewFood);
+function addMeal(){if(!selected)return alert('食品を選択してください');let g=Number(document.getElementById('foodGrams').value);if(!(g>0))return alert('重量を入力してください');db.meals.push({id:crypto.randomUUID(),date:today(),type:document.getElementById('mealType').value,name:selected.name,grams:g,kcal:selected.kcal*g/100,p:selected.p*g/100,f:selected.f*g/100,c:selected.c*g/100});saveDB();selected=null;document.getElementById('selectedFood').textContent='食品を検索して選択してください';document.getElementById('foodSearch').value='';document.getElementById('foodGrams').value=100;document.getElementById('foodPreview').textContent='栄養値の目安がここに表示されます';renderAll();alert('食事を記録しました')}
+function saveCustomFood(){let name=document.getElementById('customName').value.trim(),base=Number(document.getElementById('customBase').value),k=Number(document.getElementById('customKcal').value),p=Number(document.getElementById('customP').value),f=Number(document.getElementById('customF').value),c=Number(document.getElementById('customC').value);if(!name||!(base>0)||[k,p,f,c].some(x=>!Number.isFinite(x)||x<0))return alert('食品名・基準量・栄養成分を正しく入力してください');db.customFoods.push({id:crypto.randomUUID(),name,base,kcal:k*100/base,p:p*100/base,f:f*100/base,c:c*100/base,custom:true});saveDB();['customName','customKcal','customP','customF','customC'].forEach(id=>document.getElementById(id).value='');renderAll();renderFoodSearch();alert('マイ食品に登録しました')}
+function addTraining(){let date=document.getElementById('trainingDate').value,part=document.getElementById('bodyPart').value,exercise=document.getElementById('exercise').value.trim(),kg=Number(document.getElementById('weightKg').value)||0,reps=Number(document.getElementById('reps').value),sets=Number(document.getElementById('sets').value),memo=document.getElementById('trainingMemo').value;if(!date||!exercise||!(reps>0)||!(sets>0))return alert('日付・種目・回数・セット数を入力してください');db.trainings.push({id:crypto.randomUUID(),date,part,exercise,kg,reps,sets,memo});saveDB();document.getElementById('exercise').value='';document.getElementById('weightKg').value='';document.getElementById('reps').value='';document.getElementById('trainingMemo').value='';renderAll();alert('筋トレを記録しました')}
+function addMeasurement(){let date=document.getElementById('measureDate').value,w=document.getElementById('measureWeight').value;if(!date||w==='')return alert('測定日と体重を入力してください');db.measurements.push({id:crypto.randomUUID(),date,w:Number(w),fat:val('bodyFat'),muscle:val('muscleMass'),waist:val('waist')});saveDB();['measureWeight','bodyFat','muscleMass','waist'].forEach(id=>document.getElementById(id).value='');renderAll();alert('測定値を保存しました')}
+function val(id){let v=document.getElementById(id).value;return v===''?null:Number(v)}
+function saveNote(){db.notes[today()]=document.getElementById('dailyNote').value;saveDB();alert('メモを保存しました')}
+function saveGoals(){db.goals={kcal:Number(document.getElementById('goalInput').value)||2100,p:Number(document.getElementById('proteinGoalInput').value)||100};saveDB();renderAll();alert('目標を保存しました')}
+function delItem(arr,id){if(confirm('この記録を削除しますか？')){db[arr]=db[arr].filter(x=>x.id!==id);saveDB();renderAll()}}
+function renderAll(){let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('measurementHistory').innerHTML=ms.length?ms.map(x=>`<div class="item row"><div><b>${x.date}　${fmt(x.w)}kg</b><div class="small">${x.fat==null?'':'体脂肪 '+fmt(x.fat)+'%　'}${x.muscle==null?'':'筋肉量 '+fmt(x.muscle)+'kg　'}${x.waist==null?'':'腹囲 '+fmt(x.waist)+'cm'}</div></div><button class="danger" onclick="delItem('measurements','${x.id}')">削除</button></div>`).join(''):'<div class="empty">測定記録はまだありません</div>';document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('dailyNote').value=db.notes[today()]||'';document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';drawChart(ms)}
+function drawChart(ms){let cv=document.getElementById('weightChart');if(!cv)return;let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;ctx.clearRect(0,0,w,h);let data=[...ms].reverse();if(!data.length){ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',30,120);return}let vals=data.map(x=>x.w),min=Math.min(...vals)-.5,max=Math.max(...vals)+.5;if(max===min)max=min+1;ctx.strokeStyle='#e3e9ed';ctx.lineWidth=1;for(let i=0;i<5;i++){let y=20+i*(h-55)/4;ctx.beginPath();ctx.moveTo(45,y);ctx.lineTo(w-15,y);ctx.stroke()}ctx.strokeStyle='#239875';ctx.lineWidth=4;ctx.beginPath();data.forEach((x,i)=>{let px=45+(data.length===1?0:i*(w-80)/(data.length-1)),py=20+(max-x.w)*(h-55)/(max-min);i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke();data.forEach((x,i)=>{let px=45+(data.length===1?0:i*(w-80)/(data.length-1)),py=20+(max-x.w)*(h-55)/(max-min);ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17232d';ctx.font='12px sans-serif';ctx.fillText(fmt(x.w),px-12,py-10)});}
+function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bodylog-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
+function importData(e){let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!d.meals||!d.trainings||!d.measurements)throw Error();if(confirm('現在のデータを読み込んだバックアップで置き換えますか？')){db=d;saveDB();renderAll();alert('復元しました')}}catch(err){alert('バックアップファイルを読み込めませんでした')}};r.readAsText(file);e.target.value=''}
+function clearData(){if(confirm('本当にすべての記録を削除しますか？')){localStorage.removeItem(KEY);db=loadDB();renderAll();renderFoodSearch()}}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+renderFoodSearch();renderAll();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+</script>
+</body></html>

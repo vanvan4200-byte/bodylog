@@ -1,0 +1,10 @@
+{
+  "name": "BodyLog 食事・筋トレ管理",
+  "short_name": "BodyLog",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f6f8",
+  "theme_color": "#183247",
+  "lang": "ja",
+  "icons": []
+}
