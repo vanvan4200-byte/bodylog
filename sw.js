@@ -1,4 +1,4 @@
-const CACHE = 'bodylog-cache-v7';
+const CACHE = 'bodylog-cache-v8';
 const FILES = [
   './',
   './index.html',
