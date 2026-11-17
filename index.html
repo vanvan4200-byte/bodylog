@@ -420,7 +420,7 @@ function renderAll(){
       const monthKeys=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
       mHistoryEl.innerHTML=monthKeys.map((ym,idx)=>{
         const m=ym.match(/^(\d{4})-(\d{2})$/);
-        const label=m?`${m[1]}年${Number(m[2])}月`:ym;
+        const label=m?`${m[1]}年${Number(m[2])}月`:ym; // ← 閉じ括弧を修正済み
         const itemsHtml=groups[ym].map(x=>`<details class="measurement-detail item"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(x.date)}　${fmt(x.w)}kg</b></span><span class="small">詳細を見る　▾</span></summary><div style="padding:10px 4px 2px"><div class="small">体重：${fmt(x.w)}kg</div><div class="small">体脂肪率：${x.fat==null?'未記録':fmt(x.fat)+'%'}</div><div class="small">筋肉量：${x.muscle==null?'未記録':fmt(x.muscle)+'kg'}</div><div class="small">ウエスト：${x.waist==null?'未記録':fmt(x.waist)+'cm'}</div><button class="danger" style="margin-top:8px" onclick="delItem('measurements','${x.id}')">この記録を削除</button></div></details>`).join('');
         return `<details class="month-group"${idx===0?' open':''}><summary class="month-summary"><span>${esc(label)} <span class="small" style="font-weight:normal">（${groups[ym].length}件）</span></span><span class="small">開閉 ▾</span></summary><div class="month-items">${itemsHtml}</div></details>`;
       }).join('');
@@ -525,15 +525,13 @@ function importData(e){let file=e.target.files[0];if(!file)return;let r=new File
 function clearData(){if(confirm('本当にすべての記録を削除しますか？')){localStorage.removeItem(KEY);db=loadDB();renderAll();renderFoodSearch()}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;}[c]))}
 
-// 初期化実行
 renderFoodSearch();
 renderAll();
 setChartRange(90);
 
-// Service Workerのエラー対策（もし存在すれば登録エラーを握りつぶす）
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 }
 </script>
-//<script src="./weightfit-import.js"></script>
+<script src="./weightfit-import.js"></script>
 </body></html>
