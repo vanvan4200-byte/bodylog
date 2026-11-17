@@ -29,7 +29,8 @@ label{font-size:12px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .foodresult{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
 .foodresult button{padding:7px 10px;font-size:12px}
 .statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat{background:#f5f8f9;border-radius:12px;padding:12px}.stat strong{font-size:21px;display:block}
-.measurement-detail summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
+.measurement-detail summary::-webkit-details-marker,.month-group summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
+.month-group{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}.month-group:last-child{margin-bottom:0}.month-summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:#f5f8f9;font-weight:700;font-size:14px}.month-group[open] .month-summary{border-bottom:1px solid var(--line)}.month-items{padding:0 13px}
 .notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
 canvas{width:100%;height:210px}.chart-ranges button{font-size:12px;padding:9px 8px}.chart-ranges button.active{background:var(--navy);color:#fff}
 </style>
@@ -182,7 +183,41 @@ function saveGoals(){
  saveDB();renderAll();alert('目標を保存しました')
 }
 function delItem(arr,id){if(confirm('この記録を削除しますか？')){db[arr]=db[arr].filter(x=>x.id!==id);saveDB();renderAll()}}
-function renderAll(){let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));document.getElementById('measurementHistory').innerHTML=ms.length?ms.map(x=>`<details class="measurement-detail item"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(x.date)}　${fmt(x.w)}kg</b></span><span class="small">詳細を見る　▾</span></summary><div style="padding:10px 4px 2px"><div class="small">体重：${fmt(x.w)}kg</div><div class="small">体脂肪率：${x.fat==null?'未記録':fmt(x.fat)+'%'}</div><div class="small">筋肉量：${x.muscle==null?'未記録':fmt(x.muscle)+'kg'}</div><div class="small">ウエスト：${x.waist==null?'未記録':fmt(x.waist)+'cm'}</div><button class="danger" style="margin-top:8px" onclick="delItem('measurements','${x.id}')">この記録を削除</button></div></details>`).join(''):'<div class="empty">測定記録はまだありません</div>';document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';document.getElementById('dailyNote').value=db.notes[today()]||'';document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';drawChart(ms)}
+function renderAll(){
+ let meals=db.meals.filter(x=>x.date===today()),sum=k=>meals.reduce((a,x)=>a+(x[k]||0),0),k=sum('kcal'),p=sum('p'),f=sum('f'),c=sum('c'),goal=db.goals.kcal||2100;
+ document.getElementById('goalKcal').textContent=goal;document.getElementById('sumKcal').textContent=fmt(k);document.getElementById('sumP').textContent=fmt(p);document.getElementById('sumF').textContent=fmt(f);document.getElementById('sumC').textContent=fmt(c);document.getElementById('kcalBar').style.width=Math.min(100,k/goal*100)+'%';
+ let latest=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date))[0];
+ document.getElementById('latestWeight').textContent=latest?fmt(latest.w):'未記録';
+ document.getElementById('todaySets').textContent=db.trainings.filter(x=>x.date===today()).reduce((a,x)=>a+x.sets,0);
+ document.getElementById('todayMeals').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div><b>${esc(x.type)}・${esc(x.name)}</b><div class="small">${fmt(x.grams)}g　${fmt(x.kcal)}kcal　P${fmt(x.p)} / F${fmt(x.f)} / C${fmt(x.c)}g</div></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">まだ食事の記録がありません</div>';
+ document.getElementById('mealHistory').innerHTML=meals.length?meals.map(x=>`<div class="item row"><div>${esc(x.type)}：${esc(x.name)} <span class="small">${fmt(x.grams)}g・${fmt(x.kcal)}kcal</span></div><button class="danger" onclick="delItem('meals','${x.id}')">削除</button></div>`).join(''):'<div class="empty">今日の記録はありません</div>';
+ let ts=[...db.trainings].sort((a,b)=>b.date.localeCompare(a.date));
+ document.getElementById('trainingHistory').innerHTML=ts.length?ts.map(x=>`<div class="item row"><div><b>${esc(x.exercise)}</b><div class="small">${x.date}・${esc(x.part)}・${fmt(x.kg)}kg × ${x.reps}回 × ${x.sets}セット ${esc(x.memo||'')}</div></div><button class="danger" onclick="delItem('trainings','${x.id}')">削除</button></div>`).join(''):'<div class="empty">筋トレ記録はまだありません</div>';
+
+ // 測定履歴の1ヶ月単位グループ化表示
+ let ms=[...db.measurements].sort((a,b)=>b.date.localeCompare(a.date));
+ if(ms.length){
+  const groups={};
+  ms.forEach(x=>{
+   const ym=String(x.date||'').slice(0,7)||'不明';
+   if(!groups[ym])groups[ym]=[];
+   groups[ym].push(x);
+  });
+  const monthKeys=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  document.getElementById('measurementHistory').innerHTML=monthKeys.map((ym,idx)=>{
+   const m=ym.match(/^(\d{4})-(\d{2})$/);
+   const label=m?`${m[1]}年${Number(m[2])}月`:ym;
+   const itemsHtml=groups[ym].map(x=>`<details class="measurement-detail item"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(x.date)}　${fmt(x.w)}kg</b></span><span class="small">詳細を見る　▾</span></summary><div style="padding:10px 4px 2px"><div class="small">体重：${fmt(x.w)}kg</div><div class="small">体脂肪率：${x.fat==null?'未記録':fmt(x.fat)+'%'}</div><div class="small">筋肉量：${x.muscle==null?'未記録':fmt(x.muscle)+'kg'}</div><div class="small">ウエスト：${x.waist==null?'未記録':fmt(x.waist)+'cm'}</div><button class="danger" style="margin-top:8px" onclick="delItem('measurements','${x.id}')">この記録を削除</button></div></details>`).join('');
+   return `<details class="month-group"${idx===0?' open':''}><summary class="month-summary"><span>${esc(label)} <span class="small" style="font-weight:normal">（${groups[ym].length}件）</span></span><span class="small">開閉 ▾</span></summary><div class="month-items">${itemsHtml}</div></details>`;
+  }).join('');
+ }else{
+  document.getElementById('measurementHistory').innerHTML='<div class="empty">測定記録はまだありません</div>';
+ }
+
+ document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';document.getElementById('dailyNote').value=db.notes[today()]||'';
+ document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';
+ drawChart(ms);
+}
 function setChartRange(range){
  chartRange=range;
  document.querySelectorAll('.chart-ranges button').forEach(b=>b.classList.toggle('active',String(b.dataset.range)===String(range)));
