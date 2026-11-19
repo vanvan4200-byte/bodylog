@@ -19,7 +19,7 @@ h2{font-size:16px;margin:14px 2px 8px}h3{font-size:14px;margin:0 0 8px}
 .kcal{font-size:30px;font-weight:800;margin:4px 0}.muted{color:var(--muted);font-size:12px}
 .progress{height:8px;background:#e9eef1;border-radius:8px;overflow:hidden;margin:8px 0 10px}.progress span{display:block;height:100%;background:var(--green);width:0}
 .macros{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.macro{background:#f4f7f8;border-radius:12px;padding:9px}.macro b{display:block;font-size:17px;margin-top:2px}.p{color:var(--green)}.f{color:var(--orange)}.c{color:var(--blue)}
-.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 3px calc(6px + env(safe-area-inset-bottom));z-index:5}.tab{border:0;background:none;color:var(--muted);font-size:11px;padding:3px 0}.tab span{display:block;font-size:19px;margin-bottom:1px}.tab.active{color:var(--green);font-weight:700}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 3px calc(6px + env(safe-area-inset-bottom));z-index:5}.tab{border:0;background:none;color:var(--muted);font-size:11px;padding:3px 0}.tab span{display:grid;place-items:center;width:29px;height:27px;margin:0 auto 2px;border-radius:9px;font-size:19px}.tab.active{color:var(--green);font-weight:700}.tab .icon-food{color:#d98219;background:#fff1df}.tab .icon-training{color:#239875;background:#e4f5ef}.tab .icon-analysis{color:#397fbd;background:#e8f2fc}.tab .icon-home{color:#536b7b;background:#edf2f5}.tab .icon-settings{color:#687782;background:#eef1f3}
 button,.btn{border:0;border-radius:10px;padding:10px 12px;background:var(--navy);color:white;font-weight:650;font-size:14px;cursor:pointer}.btn.secondary,button.secondary{background:#edf2f4;color:var(--ink)}button.danger{background:#fff0ef;color:#b33b32}.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{flex:1}
 input,select{width:100%;border:1px solid #dce4e8;border-radius:10px;padding:10px;font-size:15px;background:#fff;color:var(--ink);margin:4px 0 8px}
 label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -95,12 +95,6 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
  </div>
  <div class="actions"><button onclick="showPage('food')">＋ 食事を記録</button><button class="secondary" onclick="showPage('training')">筋トレを記録</button></div>
 
- <h2>今日のメモ</h2>
- <div class="card">
-  <div class="small">食事・運動・体調の気づきを残せます</div>
-  <input id="dailyNote" placeholder="例：脚に筋肉痛あり" />
-  <button class="secondary" onclick="saveNote()">メモを保存</button>
- </div>
 </section>
 
 <!-- 食事タブ -->
@@ -180,11 +174,11 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 
 <!-- 下部タブ（ホーム・食事・筋トレ・分析・設定） -->
 <nav class="tabs" aria-label="メインナビゲーション">
- <button class="tab active" data-page="home" onclick="showPage('home')"><span>⌂</span>ホーム</button>
- <button class="tab" data-page="food" onclick="showPage('food')"><span>🍽</span>食事</button>
- <button class="tab" data-page="training" onclick="showPage('training')"><span>🏋</span>筋トレ</button>
- <button class="tab" data-page="analysis" onclick="showPage('analysis')"><span>▥</span>分析</button>
- <button class="tab" data-page="settings" onclick="showPage('settings')"><span>⚙</span>設定</button>
+ <button class="tab active" data-page="home" onclick="showPage('home')"><span class="icon-home">⌂</span>ホーム</button>
+ <button class="tab" data-page="food" onclick="showPage('food')"><span class="icon-food">🍽</span>食事</button>
+ <button class="tab" data-page="training" onclick="showPage('training')"><span class="icon-training">🏋</span>筋トレ</button>
+ <button class="tab" data-page="analysis" onclick="showPage('analysis')"><span class="icon-analysis">▥</span>分析</button>
+ <button class="tab" data-page="settings" onclick="showPage('settings')"><span class="icon-settings">⚙</span>設定</button>
 </nav>
 
 <script>
@@ -248,7 +242,6 @@ function saveHomeWeight(){
 
 function addMeasurement(){let date=document.getElementById('measureDate').value,w=document.getElementById('measureWeight').value;if(!date||w==='')return alert('測定日と体重を入力してください');db.measurements.push({id:crypto.randomUUID(),date,w:Number(w),fat:val('bodyFat'),muscle:val('muscleMass'),waist:val('waist')});saveDB();['measureWeight','bodyFat','muscleMass','waist'].forEach(id=>document.getElementById(id).value='');renderAll();alert('測定値を保存しました')}
 function val(id){let v=document.getElementById(id).value;return v===''?null:Number(v)}
-function saveNote(){db.notes[today()]=document.getElementById('dailyNote').value;saveDB();alert('メモを保存しました')}
 function saveGoals(){
  const optionalNumber=id=>{const v=document.getElementById(id).value;return v===''?null:Number(v)};
  const kcal=Number(document.getElementById('goalInput').value),p=Number(document.getElementById('proteinGoalInput').value);
@@ -290,7 +283,7 @@ function renderAll(){
   document.getElementById('measurementHistory').innerHTML='<div class="empty">測定記録はまだありません</div>';
  }
 
- document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';document.getElementById('dailyNote').value=db.notes[today()]||'';
+ document.getElementById('goalInput').value=goal;document.getElementById('proteinGoalInput').value=db.goals.p||100;document.getElementById('targetWeightInput').value=db.goals.weight??'';document.getElementById('targetFatInput').value=db.goals.fat??'';document.getElementById('targetMuscleInput').value=db.goals.muscle??'';document.getElementById('targetDateInput').value=db.goals.date||'';
  document.getElementById('customFoodList').innerHTML=db.customFoods.length?db.customFoods.map(x=>`<div class="item row"><span>${esc(x.name)}</span><button class="danger" onclick="delItem('customFoods','${x.id}')">削除</button></div>`).join(''):'<div class="empty">マイ食品はありません</div>';
  drawChart(ms);
 }
