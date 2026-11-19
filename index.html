@@ -193,7 +193,7 @@ const seedFoods=[
 ['しめじ',26,2.7,.5,4.8],['さつまいも（蒸し）',131,1.2,.2,31.9],['バナナ',93,1.1,.2,22.5],['りんご',56,.2,.3,16.2],
 ['アーモンド',609,19.6,51.8,20.9],['オートミール',350,13.7,5.7,69.1]
 ].map((x,i)=>({id:'s'+i,name:x[0],base:100,kcal:x[1],p:x[2],f:x[3],c:x[4],custom:false}));
-let db=loadDB(), selected=null, chartRange=90;
+let db=loadDB(), selected=null, chartRange=90, chartSourceMs=[], chartPointCoords=[], selectedChartIndex=-1;
 function loadDB(){try{return JSON.parse(localStorage.getItem(KEY))||{meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}catch(e){return {meals:[],trainings:[],measurements:[],customFoods:[],notes:{},goals:{kcal:2100,p:100}}}}
 function saveDB(){localStorage.setItem(KEY,JSON.stringify(db))}
 function today(){return new Date().toLocaleDateString('sv-SE')}
@@ -299,6 +299,7 @@ function dateValue(s){
 }
 function drawChart(ms){
  let cv=document.getElementById('weightChart');if(!cv)return;
+ chartSourceMs=[...ms]; chartPointCoords=[];
  const rect=cv.getBoundingClientRect();
  const cssW=Math.max(280,Math.floor(rect.width||cv.clientWidth||320));
  const cssH=Math.max(200,Math.floor(rect.height||cv.clientHeight||450));
@@ -333,6 +334,7 @@ function drawChart(ms){
   w:values.reduce((sum,v)=>sum+v,0)/values.length,
   count:values.length
  }));
+ if(selectedChartIndex>=data.length)selectedChartIndex=-1;
 
  const targetW = (db.goals && db.goals.weight !== null && db.goals.weight !== undefined && db.goals.weight !== '') ? Number(db.goals.weight) : null;
  const hasTarget = Number.isFinite(targetW);
@@ -364,9 +366,13 @@ function drawChart(ms){
  }
 
  ctx.strokeStyle='#239875';ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
- data.forEach((x,i)=>{let px=xOf(x),py=yOf(x);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
+ data.forEach((x,i)=>{let px=xOf(x),py=yOf(x);chartPointCoords.push({x:px,y:py});if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
  ctx.stroke();
- data.forEach(x=>{ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(xOf(x),yOf(x),4,0,Math.PI*2);ctx.fill();});
+ data.forEach((x,i)=>{
+  const px=xOf(x),py=yOf(x);
+  ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(px,py,4,0,Math.PI*2);ctx.fill();
+  if(i===selectedChartIndex){ctx.strokeStyle='#183247';ctx.lineWidth=3;ctx.beginPath();ctx.arc(px,py,9,0,Math.PI*2);ctx.stroke();}
+ });
 
  ctx.fillStyle='#687782';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='11px sans-serif';
  const label=s=>{let d=new Date(dateValue(s));return `${d.getUTCMonth()+1}/${d.getUTCDate()}`;};
@@ -377,12 +383,24 @@ function drawChart(ms){
  const period=chartRange==='all'?'全期間':chartRange===7?'直近1週間':chartRange===30?'直近1か月':'直近3か月';
  const targetText=hasTarget?`（目標：${fmt(targetW)}kg）`:'';
  const totalCount=raw.length;
- document.getElementById('chartCaption').textContent=`${period}・週平均${data.length}週分（元データ${totalCount}件）${targetText}。週の区切りは月曜〜日曜です。`;
+ const selectedText=selectedChartIndex>=0&&data[selectedChartIndex]
+  ? `　選択中：${data[selectedChartIndex].date}の週平均 ${fmt(data[selectedChartIndex].w)}kg（${data[selectedChartIndex].count}件の平均）`
+  : '';
+ document.getElementById('chartCaption').textContent=`${period}・週平均${data.length}週分（元データ${totalCount}件）${targetText}。週の区切りは月曜〜日曜です。グラフの点をタップすると体重を確認できます。${selectedText}`;
+}
+function selectChartPoint(event){
+ const cv=document.getElementById('weightChart');if(!cv||!chartPointCoords.length)return;
+ const rect=cv.getBoundingClientRect();
+ const px=event.clientX-rect.left,py=event.clientY-rect.top;
+ let nearest=-1,dist=Infinity;
+ chartPointCoords.forEach((p,i)=>{const d=Math.hypot(p.x-px,p.y-py);if(d<dist){dist=d;nearest=i;}});
+ if(nearest>=0&&dist<=28){selectedChartIndex=nearest;drawChart(chartSourceMs);}
 }
 function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bodylog-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
 function importData(e){let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!d.meals||!d.trainings||!d.measurements)throw Error();if(confirm('現在のデータを読み込んだバックアップで置き換えますか？')){db=d;saveDB();renderAll();alert('復元しました')}}catch(err){alert('バックアップファイルを読み込めませんでした')}};r.readAsText(file);e.target.value=''}
 function clearData(){if(confirm('本当にすべての記録を削除しますか？')){localStorage.removeItem(KEY);db=loadDB();renderAll();renderFoodSearch()}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.getElementById('weightChart')?.addEventListener('click',selectChartPoint);
 renderFoodSearch();renderAll();setChartRange(90);
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
