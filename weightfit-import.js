@@ -1,155 +1,137 @@
-/* BodyLog WeightFit CSV importer
-   Loaded after the main BodyLog script. Merges records; never replaces existing data. */
 (() => {
-  const settings = document.getElementById("settings");
-  if (!settings || typeof db === "undefined" || typeof saveDB !== "function") return;
+  const IMPORT_FLAG_KEY = 'bodylog-imported-weightfit-2026-11-19';
 
-  const card = document.createElement("div");
-  card.className = "card";
-  card.innerHTML = `
-    <h3>WeightFitから体重データを取り込む</h3>
-    <p class="small">WeightFitのCSVを読み込み、既存の体重記録に追加します。既存データは削除・上書きしません。同じCSVを再度読み込んでも、取り込み済みの記録は重複登録しません。</p>
-    <label for="weightFitCsv">WeightFitのCSVファイル</label>
-    <input id="weightFitCsv" type="file" accept=".csv,text/csv">
-    <div id="weightFitStatus" class="small" aria-live="polite">CSVファイルを選択してください。</div>
-    <button id="weightFitImport" style="width:100%;margin-top:10px" disabled>CSVの内容を確認</button>
-  `;
-  const firstCard = settings.querySelector(".card");
-  if (firstCard) firstCard.insertAdjacentElement("afterend", card);
-  else settings.appendChild(card);
+  // 一度取り込み済みなら何もしない
+  if (localStorage.getItem(IMPORT_FLAG_KEY) === 'done') return;
 
-  const input = card.querySelector("#weightFitCsv");
-  const button = card.querySelector("#weightFitImport");
-  const status = card.querySelector("#weightFitStatus");
-  let parsedRows = null;
+  // 本体側の変数・関数が揃っていない場合は何もしない
+  if (typeof db === 'undefined' || !Array.isArray(db.measurements)) return;
+  if (typeof saveDB !== 'function' || typeof renderAll !== 'function') return;
 
-  function parseCSV(text) {
-    text = text.replace(/^\uFEFF/, "");
-    const rows = [];
-    let row = [], field = "", quoted = false;
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      if (quoted) {
-        if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
-        else if (ch === '"') quoted = false;
-        else field += ch;
-      } else {
-        if (ch === '"') quoted = true;
-        else if (ch === ",") { row.push(field); field = ""; }
-        else if (ch === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-        else if (ch !== "\r") field += ch;
-      }
-    }
-    row.push(field);
-    if (row.some(v => v !== "")) rows.push(row);
-    if (!rows.length) throw new Error("CSVが空です。");
+  const importedMeasurements = [
+    { date: '2026-08-16', w: 70.2, fat: null, muscle: null, waist: null },
+    { date: '2026-08-17', w: 70.8, fat: null, muscle: null, waist: null },
+    { date: '2026-08-18', w: 71.0, fat: null, muscle: null, waist: null },
+    { date: '2026-08-19', w: 70.9, fat: null, muscle: null, waist: null },
+    { date: '2026-08-20', w: 70.7, fat: null, muscle: null, waist: null },
+    { date: '2026-08-21', w: 70.2, fat: null, muscle: null, waist: null },
+    { date: '2026-08-22', w: 70.2, fat: null, muscle: null, waist: null },
+    { date: '2026-08-23', w: 69.4, fat: null, muscle: null, waist: null },
+    { date: '2026-08-24', w: 69.9, fat: null, muscle: null, waist: null },
+    { date: '2026-08-25', w: 70.0, fat: null, muscle: null, waist: null },
+    { date: '2026-08-26', w: 70.2, fat: null, muscle: null, waist: null },
+    { date: '2026-08-27', w: 70.1, fat: null, muscle: null, waist: null },
+    { date: '2026-08-28', w: 69.8, fat: null, muscle: null, waist: null },
+    { date: '2026-08-29', w: 69.3, fat: null, muscle: null, waist: null },
+    { date: '2026-08-30', w: 68.7, fat: null, muscle: null, waist: null },
+    { date: '2026-08-31', w: 68.6, fat: null, muscle: null, waist: null },
+    { date: '2026-09-01', w: 69.3, fat: null, muscle: null, waist: null },
+    { date: '2026-09-02', w: 69.2, fat: null, muscle: null, waist: null },
+    { date: '2026-09-03', w: 69.4, fat: null, muscle: null, waist: null },
+    { date: '2026-09-04', w: 69.1, fat: null, muscle: null, waist: null },
+    { date: '2026-09-05', w: 68.7, fat: null, muscle: null, waist: null },
+    { date: '2026-09-06', w: 68.4, fat: null, muscle: null, waist: null },
+    { date: '2026-09-07', w: 68.6, fat: null, muscle: null, waist: null },
+    { date: '2026-09-08', w: 68.9, fat: null, muscle: null, waist: null },
+    { date: '2026-09-09', w: 68.8, fat: null, muscle: null, waist: null },
+    { date: '2026-09-10', w: 68.5, fat: null, muscle: null, waist: null },
+    { date: '2026-09-11', w: 68.4, fat: null, muscle: null, waist: null },
+    { date: '2026-09-12', w: 68.3, fat: null, muscle: null, waist: null },
+    { date: '2026-09-13', w: 68.3, fat: null, muscle: null, waist: null },
+    { date: '2026-09-14', w: 68.1, fat: null, muscle: null, waist: null },
+    { date: '2026-09-15', w: 68.6, fat: null, muscle: null, waist: null },
+    { date: '2026-09-16', w: 68.5, fat: null, muscle: null, waist: null },
+    { date: '2026-09-17', w: 68.4, fat: null, muscle: null, waist: null },
+    { date: '2026-09-18', w: 68.7, fat: null, muscle: null, waist: null },
+    { date: '2026-09-19', w: 68.3, fat: null, muscle: null, waist: null },
+    { date: '2026-09-20', w: 68.6, fat: null, muscle: null, waist: null },
+    { date: '2026-09-21', w: 68.3, fat: null, muscle: null, waist: null },
+    { date: '2026-09-22', w: 68.5, fat: null, muscle: null, waist: null },
+    { date: '2026-09-23', w: 68.7, fat: null, muscle: null, waist: null },
+    { date: '2026-09-24', w: 68.4, fat: null, muscle: null, waist: null },
+    { date: '2026-09-25', w: 68.6, fat: null, muscle: null, waist: null },
+    { date: '2026-09-26', w: 68.7, fat: null, muscle: null, waist: null },
+    { date: '2026-09-27', w: 67.7, fat: null, muscle: null, waist: null },
+    { date: '2026-09-28', w: 67.9, fat: null, muscle: null, waist: null },
+    { date: '2026-09-29', w: 67.9, fat: null, muscle: null, waist: null },
+    { date: '2026-09-30', w: 68.1, fat: null, muscle: null, waist: null },
+    { date: '2026-10-01', w: 68.1, fat: null, muscle: null, waist: null },
+    { date: '2026-10-02', w: 67.8, fat: null, muscle: null, waist: null },
+    { date: '2026-10-03', w: 67.7, fat: null, muscle: null, waist: null },
+    { date: '2026-10-04', w: 67.3, fat: null, muscle: null, waist: null },
+    { date: '2026-10-05', w: 67.2, fat: null, muscle: null, waist: null },
+    { date: '2026-10-06', w: 67.5, fat: null, muscle: null, waist: null },
+    { date: '2026-10-07', w: 67.8, fat: null, muscle: null, waist: null },
+    { date: '2026-10-08', w: 67.7, fat: null, muscle: null, waist: null },
+    { date: '2026-10-09', w: 68.0, fat: null, muscle: null, waist: null },
+    { date: '2026-10-10', w: 67.5, fat: null, muscle: null, waist: null },
+    { date: '2026-10-11', w: 67.4, fat: null, muscle: null, waist: null },
+    { date: '2026-10-12', w: 67.2, fat: null, muscle: null, waist: null },
+    { date: '2026-10-13', w: 67.4, fat: null, muscle: null, waist: null },
+    { date: '2026-10-14', w: 67.6, fat: null, muscle: null, waist: null },
+    { date: '2026-10-15', w: 67.6, fat: null, muscle: null, waist: null },
+    { date: '2026-10-16', w: 67.8, fat: null, muscle: null, waist: null },
+    { date: '2026-10-17', w: 68.1, fat: null, muscle: null, waist: null },
+    { date: '2026-10-18', w: 67.2, fat: null, muscle: null, waist: null },
+    { date: '2026-10-19', w: 67.0, fat: null, muscle: null, waist: null },
+    { date: '2026-10-20', w: 66.5, fat: null, muscle: null, waist: null },
+    { date: '2026-10-21', w: 67.0, fat: null, muscle: null, waist: null },
+    { date: '2026-10-22', w: 66.7, fat: null, muscle: null, waist: null },
+    { date: '2026-10-23', w: 66.8, fat: null, muscle: null, waist: null },
+    { date: '2026-10-24', w: 67.6, fat: null, muscle: null, waist: null },
+    { date: '2026-10-25', w: 66.4, fat: null, muscle: null, waist: null },
+    { date: '2026-10-26', w: 66.3, fat: null, muscle: null, waist: null },
+    { date: '2026-10-27', w: 66.6, fat: null, muscle: null, waist: null },
+    { date: '2026-10-28', w: 66.4, fat: null, muscle: null, waist: null },
+    { date: '2026-10-29', w: 66.5, fat: null, muscle: null, waist: null },
+    { date: '2026-10-30', w: 66.2, fat: null, muscle: null, waist: null },
+    { date: '2026-10-31', w: 65.5, fat: null, muscle: null, waist: null },
+    { date: '2026-11-01', w: 66.1, fat: null, muscle: null, waist: null },
+    { date: '2026-11-02', w: 65.8, fat: null, muscle: null, waist: null },
+    { date: '2026-11-03', w: 65.7, fat: null, muscle: null, waist: null },
+    { date: '2026-11-04', w: 66.3, fat: null, muscle: null, waist: null },
+    { date: '2026-11-05', w: 66.0, fat: null, muscle: null, waist: null },
+    { date: '2026-11-06', w: 65.8, fat: null, muscle: null, waist: null },
+    { date: '2026-11-07', w: 65.9, fat: null, muscle: null, waist: null },
+    { date: '2026-11-08', w: 65.5, fat: null, muscle: null, waist: null },
+    { date: '2026-11-09', w: 65.5, fat: null, muscle: null, waist: null },
+    { date: '2026-11-10', w: 65.4, fat: null, muscle: null, waist: null },
+    { date: '2026-11-11', w: 65.4, fat: null, muscle: null, waist: null },
+    { date: '2026-11-12', w: 65.3, fat: null, muscle: null, waist: null },
+    { date: '2026-11-13', w: 65.3, fat: null, muscle: null, waist: null },
+    { date: '2026-11-14', w: 65.6, fat: null, muscle: null, waist: null },
+    { date: '2026-11-15', w: 65.7, fat: null, muscle: null, waist: null },
+    { date: '2026-11-16', w: 65.2, fat: null, muscle: null, waist: null },
+    { date: '2026-11-17', w: 65.7, fat: null, muscle: null, waist: null },
+    { date: '2026-11-18', w: 65.0, fat: null, muscle: null, waist: null },
+    { date: '2026-11-19', w: 65.0, fat: null, muscle: null, waist: null }
+  ];
 
-    const headers = rows.shift().map(v => v.trim());
-    const dateIndex = headers.indexOf("Date");
-    const weightIndex = headers.indexOf("Weight (kg)");
-    if (dateIndex < 0 || weightIndex < 0) {
-      throw new Error("WeightFit形式のCSVではありません。Date と Weight (kg) の列が必要です。");
-    }
+  const existingDates = new Set(db.measurements.map(m => m.date));
+  let added = 0;
 
-    const seen = new Set();
-    const result = [];
-    let invalid = 0;
-    for (const r of rows) {
-      const timestamp = (r[dateIndex] || "").trim();
-      const weightText = (r[weightIndex] || "").trim();
-      const weight = Number(weightText);
-      if (!timestamp || !Number.isFinite(Date.parse(timestamp)) ||
-          !weightText || !Number.isFinite(weight) || weight <= 0) {
-        invalid++;
-        continue;
-      }
-      if (seen.has(timestamp)) continue;
-      seen.add(timestamp);
-      result.push({
-        timestamp,
-        date: timestamp.slice(0, 10),
-        w: weight,
-        fat: null,
-        muscle: null,
-        waist: null,
-        measuredAt: timestamp,
-        source: "WeightFit",
-        weightFitKey: timestamp
+  for (const item of importedMeasurements) {
+    if (!item || !item.date || !Number.isFinite(Number(item.w))) continue;
+    if (!existingDates.has(item.date)) {
+      db.measurements.push({
+        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        date: item.date,
+        w: Number(item.w),
+        fat: item.fat ?? null,
+        muscle: item.muscle ?? null,
+        waist: item.waist ?? null
       });
+      existingDates.add(item.date);
+      added++;
     }
-    if (!result.length) throw new Error("有効な体重データが見つかりませんでした。");
-    return { result, invalid };
   }
 
-  input.addEventListener("change", async () => {
-    parsedRows = null;
-    button.disabled = true;
-    if (!input.files || !input.files[0]) {
-      status.textContent = "CSVファイルを選択してください。";
-      return;
-    }
-    try {
-      const text = await input.files[0].text();
-      const parsed = parseCSV(text);
-      parsedRows = parsed.result;
-      status.textContent =
-        `${parsed.result.length}件を読み取れました。` +
-        (parsed.invalid ? ` 読み取れない行：${parsed.invalid}件。` : "") +
-        "「CSVの内容を確認」を押してください。";
-      button.disabled = false;
-    } catch (e) {
-      status.textContent = e.message || "CSVを読み込めませんでした。";
-    }
-  });
+  localStorage.setItem(IMPORT_FLAG_KEY, 'done');
 
-  button.addEventListener("click", () => {
-    if (!parsedRows) return;
-    const existingKeys = new Set(
-      (db.measurements || []).map(x => x.weightFitKey).filter(Boolean)
-    );
-    const newRows = parsedRows.filter(x => !existingKeys.has(x.weightFitKey));
-    const skipped = parsedRows.length - newRows.length;
-    if (!newRows.length) {
-      status.textContent = `新しく追加する記録はありません（${skipped}件は取り込み済みです）。`;
-      return;
-    }
-    const ok = confirm(
-      `WeightFitの体重記録を${newRows.length}件追加します。\n` +
-      `すでに取り込み済みのためスキップ：${skipped}件\n\n` +
-      `既存の食事・筋トレ・体重記録は削除しません。続けますか？`
-    );
-    if (!ok) return;
-    db.measurements = db.measurements || [];
-    db.measurements.push(...newRows);
+  if (added > 0) {
     saveDB();
-    if (typeof renderAll === "function") renderAll();
-    status.textContent =
-      `${newRows.length}件を追加しました。` +
-      (skipped ? ` 重複の${skipped}件はスキップしました。` : "");
-    button.disabled = true;
-    input.value = "";
-    parsedRows = null;
-    alert(`${newRows.length}件の体重記録をBodyLogに追加しました。`);
-  });
-
-  // Imported entries retain the measurement time; show it in the history list.
-  if (typeof renderAll === "function") {
-    const originalRenderAll = renderAll;
-    renderAll = function () {
-      originalRenderAll();
-      const ordered = [...(db.measurements || [])]
-        .sort((a, b) => b.date.localeCompare(a.date));
-      const nodes = document.querySelectorAll("#measurementHistory .item");
-      ordered.forEach((entry, i) => {
-        if (!entry.measuredAt || !nodes[i]) return;
-        const strong = nodes[i].querySelector("b");
-        if (!strong) return;
-        const time = entry.measuredAt.match(/T(\d{2}:\d{2})/);
-        if (time && !strong.textContent.includes(time[1])) {
-          strong.textContent += `　${time[1]}`;
-        }
-      });
-    };
     renderAll();
   }
 })();
