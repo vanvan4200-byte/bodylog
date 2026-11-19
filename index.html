@@ -32,7 +32,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .measurement-detail summary::-webkit-details-marker,.month-group summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
 .month-group{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}.month-group:last-child{margin-bottom:0}.month-summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:#f5f8f9;font-weight:700;font-size:14px}.month-group[open] .month-summary{border-bottom:1px solid var(--line)}.month-items{padding:0 13px}
 .notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
-#weightChart{width:100%;height:360px;display:block}.chart-ranges button{font-size:11px;padding:6px 6px}.chart-ranges button.active{background:var(--navy);color:#fff}
+#weightChart{width:100%;height:450px;display:block}.chart-ranges button{font-size:11px;padding:6px 6px}.chart-ranges button.active{background:var(--navy);color:#fff}
 .compact-weight-form{display:grid;grid-template-columns:1.15fr 1fr auto;gap:6px;align-items:end}
 .compact-weight-form input{margin:3px 0 0;padding:8px;font-size:14px}
 .compact-weight-form button{padding:8px 14px;height:36px;white-space:nowrap}
@@ -46,7 +46,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
  </div>
 </header>
 <main>
-<!-- ホーム：高さ360pxの体重グラフ＋直下のコンパクトな体重入力 -->
+<!-- ホーム：高さ450pxの体重グラフ＋直下のコンパクトな体重入力 -->
 <section id="home" class="page">
  <div class="card">
   <div class="row" style="margin-bottom:6px">
@@ -59,7 +59,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
    <button type="button" class="secondary" data-range="90" onclick="setChartRange(90)">3か月</button>
    <button type="button" class="secondary" data-range="all" onclick="setChartRange('all')">全期間</button>
   </div>
-  <canvas id="weightChart" style="height:360px"></canvas>
+  <canvas id="weightChart" style="height:450px"></canvas>
   <div class="small" id="chartCaption" style="margin-top:6px">体重の推移を表示します。</div>
  </div>
 
