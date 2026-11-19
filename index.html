@@ -32,7 +32,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .measurement-detail summary::-webkit-details-marker,.month-group summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
 .month-group{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}.month-group:last-child{margin-bottom:0}.month-summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:#f5f8f9;font-weight:700;font-size:14px}.month-group[open] .month-summary{border-bottom:1px solid var(--line)}.month-items{padding:0 13px}
 .notice{background:#fff8e9;border:1px solid #f4e3bd;color:#76571d;padding:10px;border-radius:11px;font-size:12px;line-height:1.55}
-canvas{width:100%;height:290px;display:block}.chart-ranges button{font-size:11px;padding:6px 6px}.chart-ranges button.active{background:var(--navy);color:#fff}
+#weightChart{width:100%;height:360px;display:block}.chart-ranges button{font-size:11px;padding:6px 6px}.chart-ranges button.active{background:var(--navy);color:#fff}
 .compact-weight-form{display:grid;grid-template-columns:1.15fr 1fr auto;gap:6px;align-items:end}
 .compact-weight-form input{margin:3px 0 0;padding:8px;font-size:14px}
 .compact-weight-form button{padding:8px 14px;height:36px;white-space:nowrap}
@@ -46,7 +46,7 @@ canvas{width:100%;height:290px;display:block}.chart-ranges button{font-size:11px
  </div>
 </header>
 <main>
-<!-- ホーム：高さ大きめの体重グラフ＋直下のコンパクトな体重入力 -->
+<!-- ホーム：高さ360pxの体重グラフ＋直下のコンパクトな体重入力 -->
 <section id="home" class="page">
  <div class="card">
   <div class="row" style="margin-bottom:6px">
@@ -59,7 +59,7 @@ canvas{width:100%;height:290px;display:block}.chart-ranges button{font-size:11px
    <button type="button" class="secondary" data-range="90" onclick="setChartRange(90)">3か月</button>
    <button type="button" class="secondary" data-range="all" onclick="setChartRange('all')">全期間</button>
   </div>
-  <canvas id="weightChart" width="600" height="340"></canvas>
+  <canvas id="weightChart" style="height:360px"></canvas>
   <div class="small" id="chartCaption" style="margin-top:6px">体重の推移を表示します。</div>
  </div>
 
@@ -306,16 +306,24 @@ function dateValue(s){
 }
 function drawChart(ms){
  let cv=document.getElementById('weightChart');if(!cv)return;
- let ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+ const rect=cv.getBoundingClientRect();
+ const cssW=Math.max(280,Math.floor(rect.width||cv.clientWidth||320));
+ const cssH=Math.max(200,Math.floor(rect.height||cv.clientHeight||360));
+ const dpr=Math.min(window.devicePixelRatio||1,2);
+ cv.width=Math.floor(cssW*dpr);
+ cv.height=Math.floor(cssH*dpr);
+ let ctx=cv.getContext('2d');
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ let w=cssW,h=cssH;
  ctx.clearRect(0,0,w,h);
  let data=[...ms].filter(x=>x.w!==null&&x.w!==undefined&&x.w!==''&&Number.isFinite(Number(x.w))&&Number.isFinite(dateValue(x.date))).sort((a,b)=>dateValue(a.date)-dateValue(b.date));
  if(!data.length){
-  ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',30,170);
+  ctx.fillStyle='#687782';ctx.font='14px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',24,h/2);
   document.getElementById('chartCaption').textContent='測定データはまだありません。';return;
  }
  let end=dateValue(data[data.length-1].date), start=chartRange==='all'?dateValue(data[0].date):end-Number(chartRange)*86400000;
  if(chartRange!=='all')data=data.filter(x=>dateValue(x.date)>=start&&dateValue(x.date)<=end);
- if(!data.length){ctx.fillStyle='#687782';ctx.font='16px sans-serif';ctx.fillText('この期間の測定データはありません',30,170);return;}
+ if(!data.length){ctx.fillStyle='#687782';ctx.font='14px sans-serif';ctx.fillText('この期間の測定データはありません',24,h/2);return;}
 
  const targetW = (db.goals && db.goals.weight !== null && db.goals.weight !== undefined && db.goals.weight !== '') ? Number(db.goals.weight) : null;
  const hasTarget = Number.isFinite(targetW);
@@ -325,12 +333,12 @@ function drawChart(ms){
  let min=Math.floor((Math.min(...vals)-.3)*2)/2,max=Math.ceil((Math.max(...vals)+.3)*2)/2;
  if(max<=min)max=min+1;
 
- const left=56,right=w-16,top=16,bottom=h-36,plotW=right-left,plotH=bottom-top;
- ctx.font='12px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillStyle='#687782';ctx.strokeStyle='#e3e9ed';ctx.lineWidth=1;
+ const left=48,right=w-12,top=14,bottom=h-30,plotW=right-left,plotH=bottom-top;
+ ctx.font='11px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillStyle='#687782';ctx.strokeStyle='#e3e9ed';ctx.lineWidth=1;
  for(let i=0;i<5;i++){
   let v=max-i*(max-min)/4,y=top+i*plotH/4;
   ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();
-  ctx.fillText(v.toFixed(1),left-8,y);
+  ctx.fillText(v.toFixed(1),left-6,y);
  }
 
  const first=dateValue(data[0].date),last=dateValue(data[data.length-1].date),span=Math.max(1,last-first);
@@ -352,7 +360,7 @@ function drawChart(ms){
   ctx.fillStyle='#e2a33b';
   ctx.font='bold 11px sans-serif';
   ctx.textAlign='right';
-  const labelY = ty - top < 18 ? ty + 12 : ty - 8;
+  const labelY = ty - top < 16 ? ty + 12 : ty - 8;
   ctx.fillText(`目標 ${fmt(targetW)}kg`, right - 4, labelY);
   ctx.restore();
  }
@@ -366,7 +374,7 @@ function drawChart(ms){
  const label=s=>{let d=new Date(dateValue(s));return `${d.getUTCMonth()+1}/${d.getUTCDate()}`;};
  const labels=[data[0].date,data[Math.floor((data.length-1)/2)].date,data[data.length-1].date];
  const positions=[left,(left+right)/2,right];
- labels.forEach((s,i)=>ctx.fillText(label(s),positions[i],bottom+10));
+ labels.forEach((s,i)=>ctx.fillText(label(s),positions[i],bottom+8));
 
  const period=chartRange==='all'?'全期間':chartRange===7?'直近1週間':chartRange===30?'直近1か月':'直近3か月';
  const targetText=hasTarget?`（目標：${fmt(targetW)}kg）`:'';
