@@ -301,7 +301,7 @@ function drawChart(ms){
  let cv=document.getElementById('weightChart');if(!cv)return;
  const rect=cv.getBoundingClientRect();
  const cssW=Math.max(280,Math.floor(rect.width||cv.clientWidth||320));
- const cssH=Math.max(200,Math.floor(rect.height||cv.clientHeight||360));
+ const cssH=Math.max(200,Math.floor(rect.height||cv.clientHeight||450));
  const dpr=Math.min(window.devicePixelRatio||1,2);
  cv.width=Math.floor(cssW*dpr);
  cv.height=Math.floor(cssH*dpr);
@@ -309,18 +309,33 @@ function drawChart(ms){
  ctx.setTransform(dpr,0,0,dpr,0,0);
  let w=cssW,h=cssH;
  ctx.clearRect(0,0,w,h);
- let data=[...ms].filter(x=>x.w!==null&&x.w!==undefined&&x.w!==''&&Number.isFinite(Number(x.w))&&Number.isFinite(dateValue(x.date))).sort((a,b)=>dateValue(a.date)-dateValue(b.date));
- if(!data.length){
+ let raw=[...ms].filter(x=>x.w!==null&&x.w!==undefined&&x.w!==''&&Number.isFinite(Number(x.w))&&Number.isFinite(dateValue(x.date))).sort((a,b)=>dateValue(a.date)-dateValue(b.date));
+ if(!raw.length){
   ctx.fillStyle='#687782';ctx.font='14px sans-serif';ctx.fillText('体重を記録するとグラフが表示されます',24,h/2);
   document.getElementById('chartCaption').textContent='測定データはまだありません。';return;
  }
- let end=dateValue(data[data.length-1].date), start=chartRange==='all'?dateValue(data[0].date):end-Number(chartRange)*86400000;
- if(chartRange!=='all')data=data.filter(x=>dateValue(x.date)>=start&&dateValue(x.date)<=end);
- if(!data.length){ctx.fillStyle='#687782';ctx.font='14px sans-serif';ctx.fillText('この期間の測定データはありません',24,h/2);return;}
+ let end=dateValue(raw[raw.length-1].date), start=chartRange==='all'?dateValue(raw[0].date):end-Number(chartRange)*86400000;
+ if(chartRange!=='all')raw=raw.filter(x=>dateValue(x.date)>=start&&dateValue(x.date)<=end);
+ if(!raw.length){ctx.fillStyle='#687782';ctx.font='14px sans-serif';ctx.fillText('この期間の測定データはありません',24,h/2);return;}
+
+ // 月曜日始まりの週単位で集計し、各週の体重平均だけをグラフに表示する。
+ const weekGroups=new Map();
+ raw.forEach(x=>{
+  const day=dateValue(x.date);
+  const date=new Date(day);
+  const weekday=(date.getUTCDay()+6)%7; // 月曜=0
+  const weekStart=day-weekday*86400000;
+  if(!weekGroups.has(weekStart))weekGroups.set(weekStart,[]);
+  weekGroups.get(weekStart).push(Number(x.w));
+ });
+ let data=[...weekGroups.entries()].sort((a,b)=>a[0]-b[0]).map(([weekStart,values])=>({
+  date:new Date(weekStart+3*86400000).toISOString().slice(0,10),
+  w:values.reduce((sum,v)=>sum+v,0)/values.length,
+  count:values.length
+ }));
 
  const targetW = (db.goals && db.goals.weight !== null && db.goals.weight !== undefined && db.goals.weight !== '') ? Number(db.goals.weight) : null;
  const hasTarget = Number.isFinite(targetW);
-
  let vals=data.map(x=>Number(x.w));
  if(hasTarget) vals.push(targetW);
  let min=Math.floor((Math.min(...vals)-.3)*2)/2,max=Math.ceil((Math.max(...vals)+.3)*2)/2;
@@ -341,27 +356,17 @@ function drawChart(ms){
 
  if(hasTarget){
   const ty=yVal(targetW);
-  ctx.save();
-  ctx.strokeStyle='#e2a33b';
-  ctx.lineWidth=2;
-  ctx.setLineDash([6,4]);
-  ctx.beginPath();
-  ctx.moveTo(left,ty);
-  ctx.lineTo(right,ty);
-  ctx.stroke();
-
-  ctx.fillStyle='#e2a33b';
-  ctx.font='bold 11px sans-serif';
-  ctx.textAlign='right';
-  const labelY = ty - top < 16 ? ty + 12 : ty - 8;
-  ctx.fillText(`目標 ${fmt(targetW)}kg`, right - 4, labelY);
-  ctx.restore();
+  ctx.save();ctx.strokeStyle='#e2a33b';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.moveTo(left,ty);ctx.lineTo(right,ty);ctx.stroke();
+  ctx.fillStyle='#e2a33b';ctx.font='bold 11px sans-serif';ctx.textAlign='right';
+  const labelY=ty-top<16?ty+12:ty-8;
+  ctx.fillText(`目標 ${fmt(targetW)}kg`,right-4,labelY);ctx.restore();
  }
 
  ctx.strokeStyle='#239875';ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();
  data.forEach((x,i)=>{let px=xOf(x),py=yOf(x);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);});
  ctx.stroke();
- data.forEach(x=>{ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(xOf(x),yOf(x),3,0,Math.PI*2);ctx.fill();});
+ data.forEach(x=>{ctx.fillStyle='#239875';ctx.beginPath();ctx.arc(xOf(x),yOf(x),4,0,Math.PI*2);ctx.fill();});
 
  ctx.fillStyle='#687782';ctx.textAlign='center';ctx.textBaseline='top';ctx.font='11px sans-serif';
  const label=s=>{let d=new Date(dateValue(s));return `${d.getUTCMonth()+1}/${d.getUTCDate()}`;};
@@ -371,7 +376,8 @@ function drawChart(ms){
 
  const period=chartRange==='all'?'全期間':chartRange===7?'直近1週間':chartRange===30?'直近1か月':'直近3か月';
  const targetText=hasTarget?`（目標：${fmt(targetW)}kg）`:'';
- document.getElementById('chartCaption').textContent=`${period}・${data.length}件の測定値${targetText}。`;
+ const totalCount=raw.length;
+ document.getElementById('chartCaption').textContent=`${period}・週平均${data.length}週分（元データ${totalCount}件）${targetText}。週の区切りは月曜〜日曜です。`;
 }
 function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='bodylog-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href)}
 function importData(e){let file=e.target.files[0];if(!file)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!d.meals||!d.trainings||!d.measurements)throw Error();if(confirm('現在のデータを読み込んだバックアップで置き換えますか？')){db=d;saveDB();renderAll();alert('復元しました')}}catch(err){alert('バックアップファイルを読み込めませんでした')}};r.readAsText(file);e.target.value=''}
