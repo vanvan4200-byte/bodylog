@@ -28,7 +28,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .pill-selected{font-size:11px;background:#183247;color:#fff;padding:3px 9px;border-radius:99px;font-weight:600}
 .hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:18px 5px;font-size:13px}
 .foodresult{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}
-.foodresult button{padding:7px 10px;font-size:12px}
+.foodresult button{padding:7px 10px;font-size:12px;white-space:nowrap}
 .statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.stat{background:#f5f8f9;border-radius:12px;padding:10px 12px}.stat strong{font-size:20px;display:block}
 .measurement-detail summary::-webkit-details-marker,.month-group summary::-webkit-details-marker{display:none}.measurement-detail[open] summary .small{color:var(--green)}
 .month-group{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}.month-group:last-child{margin-bottom:0}.month-summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:#f5f8f9;font-weight:700;font-size:14px}.month-group[open] .month-summary{border-bottom:1px solid var(--line)}.month-items{padding:0 13px}
@@ -38,10 +38,14 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .compact-weight-form input{margin:3px 0 0;padding:8px;font-size:14px}
 .compact-weight-form button{padding:8px 14px;height:36px;white-space:nowrap}
 .food-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.subtabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#eef3f6;padding:4px;border-radius:11px;margin:8px 0 10px}
-.subtab{border:0;background:transparent;color:var(--muted);padding:8px 10px;border-radius:8px;font-size:13px;font-weight:700}
+.subtabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:#eef3f6;padding:4px;border-radius:11px;margin:8px 0 10px}
+.subtab{border:0;background:transparent;color:var(--muted);padding:8px 6px;border-radius:8px;font-size:12px;font-weight:700}
 .subtab.active{background:#fff;color:var(--navy);box-shadow:0 1px 4px #1d354514}
 .badge-jan{display:inline-block;font-size:10px;background:#eef3f6;color:#465966;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.badge-web{display:inline-block;font-size:10px;background:#e8f2fc;color:#2c6aa0;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.search-bar{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.search-bar input{margin:4px 0 8px}
+.search-bar button{margin:4px 0 8px;padding:10px 14px;white-space:nowrap}
 .scan-modal{position:fixed;inset:0;background:#0e1b24cc;z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
 .scan-box{background:#fff;color:var(--ink);width:100%;max-width:460px;border-radius:16px;padding:14px;box-shadow:0 12px 32px #00000040}
 #barcodeVideo{width:100%;max-height:280px;background:#111;border-radius:12px;object-fit:cover}
@@ -123,25 +127,32 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
    <button type="button" class="secondary" onclick="focusCustomFoodForm()">＋ 新規食品登録</button>
   </div>
 
-  <!-- 2. 過去の履歴 / マイメニュー 切り替え -->
+  <!-- 2. 過去の履歴 / マイメニュー / Web検索 切り替え -->
   <div class="subtabs" role="tablist">
    <button type="button" id="tabFoodHistory" class="subtab active" onclick="setFoodSourceTab('history')">過去の履歴</button>
    <button type="button" id="tabFoodMyMenu" class="subtab" onclick="setFoodSourceTab('mymenu')">マイメニュー</button>
+   <button type="button" id="tabFoodWeb" class="subtab" onclick="setFoodSourceTab('web')">Web検索</button>
   </div>
 
   <label id="foodSearchLabel">過去の履歴から検索</label>
-  <input id="foodSearch" placeholder="商品名やJANコードで絞り込み" oninput="renderFoodCandidates()">
+  <div class="search-bar">
+   <input id="foodSearch" placeholder="商品名やJANコードで絞り込み" oninput="onFoodSearchInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerFoodSearch();}">
+   <button type="button" id="foodWebSearchBtn" class="hidden" onclick="searchWebProducts()">検索</button>
+  </div>
   <div id="foodResults"></div>
  </div>
 
  <!-- 3. 選択した食品の分量調整・追加 -->
  <div class="card">
   <h3>選択した食品</h3>
-  <div id="selectedFood" class="empty">「過去の履歴」または「マイメニュー」から選択するか、バーコードを読み取ってください</div>
+  <div id="selectedFood" class="empty">「過去の履歴」「マイメニュー」「Web検索」から選択するか、バーコードを読み取ってください</div>
   <label>重量（g）</label>
   <input id="foodGrams" type="number" min="0" value="100">
   <div class="small" id="foodPreview">栄養値の目安がここに表示されます</div>
-  <button style="width:100%;margin-top:12px" onclick="addMeal()">この内容を食事に追加</button>
+  <div class="actions" style="margin-top:12px">
+   <button onclick="addMeal()">この内容を食事に追加</button>
+   <button type="button" id="saveSelectedToMenuBtn" class="secondary hidden" onclick="saveSelectedToMyMenu()">マイメニューにも保存</button>
+  </div>
  </div>
 
  <!-- 4. 食品の手動登録（マイメニュー登録＋JAN紐付け対応） -->
@@ -242,7 +253,9 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 <script>
 const KEY='bodylog-v1';
 let db=loadDB(), selected=null, chartRange=90, chartSourceMs=[], chartPointCoords=[], selectedChartIndex=-1;
-let foodSourceTab='history'; // 'history' | 'mymenu'
+let foodSourceTab='history'; // 'history' | 'mymenu' | 'web'
+let webSearchResults=[];
+let webSearchTimer=null;
 let barcodeStream=null;
 let barcodeTimer=null;
 
@@ -272,13 +285,114 @@ function setFoodSourceTab(tab){
  foodSourceTab=tab;
  document.getElementById('tabFoodHistory').classList.toggle('active',tab==='history');
  document.getElementById('tabFoodMyMenu').classList.toggle('active',tab==='mymenu');
- document.getElementById('foodSearchLabel').textContent=tab==='history'?'過去の履歴から検索':'マイメニューから検索';
- document.getElementById('foodSearch').value='';
+ document.getElementById('tabFoodWeb').classList.toggle('active',tab==='web');
+
+ const labelMap={
+  history:'過去の履歴から検索',
+  mymenu:'マイメニューから検索',
+  web:'Webデータベース（Open Food Facts）から検索'
+ };
+ const placeholderMap={
+  history:'商品名やJANコードで絞り込み',
+  mymenu:'マイメニュー名やJANコードで絞り込み',
+  web:'商品名を入力（例：ザバス、サラダチキン、オイコス）'
+ };
+ document.getElementById('foodSearchLabel').textContent=labelMap[tab];
+ const searchInput=document.getElementById('foodSearch');
+ searchInput.placeholder=placeholderMap[tab];
+ searchInput.value='';
+ document.getElementById('foodWebSearchBtn').classList.toggle('hidden',tab!=='web');
  renderFoodCandidates();
+ if(tab==='web')searchInput.focus();
+}
+
+function onFoodSearchInput(){
+ if(foodSourceTab==='web'){
+  clearTimeout(webSearchTimer);
+  const q=document.getElementById('foodSearch').value.trim();
+  if(!q){
+   webSearchResults=[];
+   renderFoodCandidates();
+   return;
+  }
+  webSearchTimer=setTimeout(()=>searchWebProducts(),650);
+  return;
+ }
+ renderFoodCandidates();
+}
+
+function triggerFoodSearch(){
+ if(foodSourceTab==='web'){
+  clearTimeout(webSearchTimer);
+  searchWebProducts();
+ }else{
+  renderFoodCandidates();
+ }
 }
 
 function renderFoodSearch(){
  renderFoodCandidates();
+}
+
+// Open Food Facts の product オブジェクトから 100g あたり栄養値を抽出
+function normalizeOffProduct(prod){
+ if(!prod)return null;
+ const n=prod.nutriments||{};
+ const name=(prod.product_name_ja||prod.product_name||prod.generic_name_ja||prod.generic_name||'').trim();
+ if(!name)return null;
+ const brand=(prod.brands||'').split(',')[0].trim();
+ const jan=String(prod.code||prod._id||'').trim();
+
+ let kcal=Number(n['energy-kcal_100g']);
+ if(!Number.isFinite(kcal)||kcal<=0){
+  const kj=Number(n['energy-kj_100g']||n['energy_100g']);
+  if(Number.isFinite(kj)&&kj>0)kcal=kj/4.184;
+  else kcal=0;
+ }
+ const p=Number(n['proteins_100g'])||0;
+ const f=Number(n['fat_100g'])||0;
+ const c=Number(n['carbohydrates_100g'])||0;
+
+ // 内容量（例: "200 g", "430 ml"）が数値で取れれば初期分量に活用
+ let defaultGrams=100;
+ const qtyMatch=String(prod.quantity||'').match(/(\d+(?:\.\d+)?)\s*(g|ml|グラム)/i);
+ if(qtyMatch){
+  const parsed=Number(qtyMatch[1]);
+  if(parsed>0&&parsed<=2000)defaultGrams=parsed;
+ }
+
+ return {
+  id:`web_${jan||crypto.randomUUID()}`,
+  name:brand&&!name.includes(brand)?`${name}（${brand}）`:name,
+  jan,
+  kcal:Math.max(0,kcal),
+  p:Math.max(0,p),
+  f:Math.max(0,f),
+  c:Math.max(0,c),
+  defaultGrams,
+  isWeb:true
+ };
+}
+
+async function searchWebProducts(){
+ const el=document.getElementById('foodResults');
+ const q=(document.getElementById('foodSearch')?.value||'').trim();
+ if(!q){
+  el.innerHTML='<div class="empty">検索キーワードを入力して「検索」を押してください。</div>';
+  return;
+ }
+ el.innerHTML='<div class="empty">Webデータベースを検索中...</div>';
+ try{
+  const url=`https://jp.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`;
+  const res=await fetch(url);
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  const products=Array.isArray(data.products)?data.products:[];
+  webSearchResults=products.map(normalizeOffProduct).filter(Boolean);
+  renderFoodCandidates();
+ }catch(err){
+  el.innerHTML='<div class="empty">Web検索に失敗しました。通信状況を確認するか、「＋ 新規食品登録」から手動で登録してください。</div>';
+ }
 }
 
 function getHistoryCandidates(){
@@ -311,9 +425,30 @@ function renderFoodCandidates(){
  if(!el)return;
  const q=(document.getElementById('foodSearch')?.value||'').trim().toLowerCase();
 
+ if(foodSourceTab==='web'){
+  if(!q){
+   el.innerHTML='<div class="empty">商品名を入力すると、Web上の公開食品データ（Open Food Facts）から栄養成分を検索できます。</div>';
+   return;
+  }
+  if(!webSearchResults.length){
+   el.innerHTML='<div class="empty">該当する商品が見つかりませんでした。別のキーワードに変えるか、「＋ 新規食品登録」から追加してください。</div>';
+   return;
+  }
+  el.innerHTML=webSearchResults.map((f,idx)=>`
+   <div class="foodresult">
+    <div>
+     <b>${esc(f.name)}</b><span class="badge-web">Web</span>${f.jan?`<span class="badge-jan">JAN:${esc(f.jan)}</span>`:''}
+     <div class="small">${fmt(f.kcal)} kcal / 100g　P${fmt(f.p)} F${fmt(f.f)} C${fmt(f.c)}</div>
+    </div>
+    <button type="button" onclick="selectWebResult(${idx})">選択</button>
+   </div>
+  `).join('');
+  return;
+ }
+
  if(foodSourceTab==='mymenu'){
   if(!db.customFoods.length){
-   el.innerHTML='<div class="empty">マイメニューがまだ登録されていません。「＋ 新規食品登録」またはバーコード読込から追加してください。</div>';
+   el.innerHTML='<div class="empty">マイメニューがまだ登録されていません。「＋ 新規食品登録」や「Web検索」から追加してください。</div>';
    return;
   }
   const list=db.customFoods
@@ -333,7 +468,7 @@ function renderFoodCandidates(){
 
  const histList=getHistoryCandidates();
  if(!histList.length){
-  el.innerHTML='<div class="empty">過去の食事履歴がまだありません。「マイメニュー」や「バーコード読込」から記録してみましょう。</div>';
+  el.innerHTML='<div class="empty">過去の食事履歴がまだありません。「マイメニュー」「Web検索」「バーコード読込」から記録してみましょう。</div>';
   return;
  }
  const filtered=histList
@@ -348,6 +483,12 @@ function renderFoodCandidates(){
    <button type="button" onclick="selectCandidateById('history','${f.id}')">選択</button>
   </div>
  `).join('')||'<div class="empty">該当する履歴がありません。</div>';
+}
+
+function selectWebResult(idx){
+ const item=webSearchResults[idx];
+ if(!item)return;
+ applySelectedFood(item,item.defaultGrams||100);
 }
 
 function selectCandidateById(source,id){
@@ -368,7 +509,32 @@ function applySelectedFood(item,grams=100){
  };
  document.getElementById('selectedFood').textContent=`${selected.name}${selected.jan?`（JAN: ${selected.jan}）`:''}`;
  document.getElementById('foodGrams').value=fmt(grams);
+ const alreadyInMenu=db.customFoods.some(f=>
+  (selected.jan&&String(f.jan||'').trim()===selected.jan)||f.name===selected.name
+ );
+ document.getElementById('saveSelectedToMenuBtn')?.classList.toggle('hidden',alreadyInMenu);
  previewFood();
+}
+
+function saveSelectedToMyMenu(){
+ if(!selected)return;
+ const base=Number(document.getElementById('foodGrams').value)||100;
+ db.customFoods.push({
+  id:crypto.randomUUID(),
+  name:selected.name,
+  jan:selected.jan||'',
+  base,
+  kcal:selected.kcal,
+  p:selected.p,
+  f:selected.f,
+  c:selected.c,
+  custom:true
+ });
+ saveDB();
+ document.getElementById('saveSelectedToMenuBtn')?.classList.add('hidden');
+ renderAll();
+ renderFoodCandidates();
+ alert(`「${selected.name}」をマイメニューに保存しました`);
 }
 
 function previewFood(){
@@ -396,7 +562,8 @@ function addMeal(){
  });
  saveDB();
  selected=null;
- document.getElementById('selectedFood').textContent='「過去の履歴」または「マイメニュー」から選択するか、バーコードを読み取ってください';
+ document.getElementById('selectedFood').textContent='「過去の履歴」「マイメニュー」「Web検索」から選択するか、バーコードを読み取ってください';
+ document.getElementById('saveSelectedToMenuBtn')?.classList.add('hidden');
  document.getElementById('foodSearch').value='';
  document.getElementById('foodGrams').value=100;
  document.getElementById('foodPreview').textContent='栄養値の目安がここに表示されます';
@@ -497,11 +664,12 @@ function closeBarcodeScanner(){
  document.getElementById('barcodeModal')?.classList.add('hidden');
 }
 
-function lookupJanCode(rawCode){
+async function lookupJanCode(rawCode){
  const code=String(rawCode||'').trim();
  if(!code)return alert('JANコードを入力してください');
  closeBarcodeScanner();
 
+ // 1. マイメニュー（customFoods）からJAN一致を検索
  const inMenu=db.customFoods.find(f=>String(f.jan||'').trim()===code);
  if(inMenu){
   applySelectedFood(inMenu,inMenu.base||100);
@@ -509,6 +677,7 @@ function lookupJanCode(rawCode){
   return;
  }
 
+ // 2. 過去の履歴（meals）からJAN一致を検索
  const inHist=getHistoryCandidates().find(f=>String(f.jan||'').trim()===code);
  if(inHist){
   applySelectedFood(inHist,inHist.defaultGrams||100);
@@ -516,10 +685,29 @@ function lookupJanCode(rawCode){
   return;
  }
 
+ // 3. Open Food Facts API からJANコードで商品情報を取得
+ document.getElementById('selectedFood').textContent=`JAN:${code} をWebデータベースから検索中...`;
+ try{
+  const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`);
+  if(res.ok){
+   const data=await res.json();
+   if(data&&data.status===1&&data.product){
+    const webFood=normalizeOffProduct({...data.product,code});
+    if(webFood){
+     applySelectedFood(webFood,webFood.defaultGrams||100);
+     alert(`Webデータベースから「${webFood.name}」を取得しました！栄養値を確認して追加してください。`);
+     return;
+    }
+   }
+  }
+ }catch(_){}
+
+ // 4. Webにも未登録だった場合は登録フォームへJANコードを引き継ぎ
+ document.getElementById('selectedFood').textContent='「過去の履歴」「マイメニュー」「Web検索」から選択するか、バーコードを読み取ってください';
  const janInput=document.getElementById('customJan');
  if(janInput)janInput.value=code;
  focusCustomFoodForm();
- alert(`JANコード「${code}」は未登録です。栄養成分を入力してマイメニューに登録してください。`);
+ alert(`JANコード「${code}」はWebデータベースにも未登録でした。パッケージの栄養成分を入力してマイメニューに登録してください。`);
 }
 
 function addTraining(){let date=document.getElementById('trainingDate').value,part=document.getElementById('bodyPart').value,exercise=document.getElementById('exercise').value.trim(),kg=Number(document.getElementById('weightKg').value)||0,reps=Number(document.getElementById('reps').value),sets=Number(document.getElementById('sets').value),memo=document.getElementById('trainingMemo').value;if(!date||!exercise||!(reps>0)||!(sets>0))return alert('日付・種目・回数・セット数を入力してください');db.trainings.push({id:crypto.randomUUID(),date,part,exercise,kg,reps,sets,memo});saveDB();document.getElementById('exercise').value='';document.getElementById('weightKg').value='';document.getElementById('reps').value='';document.getElementById('trainingMemo').value='';renderAll();alert('筋トレを記録しました')}
