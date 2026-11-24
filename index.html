@@ -43,6 +43,7 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 .subtab.active{background:#fff;color:var(--navy);box-shadow:0 1px 4px #1d354514}
 .badge-jan{display:inline-block;font-size:10px;background:#eef3f6;color:#465966;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
 .badge-web{display:inline-block;font-size:10px;background:#e8f2fc;color:#2c6aa0;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.badge-tavily{display:inline-block;font-size:10px;background:#fff1df;color:#b86b0f;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle}
 .search-bar{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
 .search-bar input{margin:4px 0 8px}
 .search-bar button{margin:4px 0 8px;padding:10px 14px;white-space:nowrap}
@@ -252,9 +253,13 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 
 <script>
 const KEY='bodylog-v1';
+// ★ ご自身の Cloudflare Workers URL に書き換えてください
+const TAVILY_WORKER_URL='https://あなたのWorker名.サブドメイン.workers.dev';
+
 let db=loadDB(), selected=null, chartRange=90, chartSourceMs=[], chartPointCoords=[], selectedChartIndex=-1;
 let foodSourceTab='history'; // 'history' | 'mymenu' | 'web'
 let webSearchResults=[];
+let webSearchSource=''; // 'off' | 'tavily' | ''
 let webSearchTimer=null;
 let barcodeStream=null;
 let barcodeTimer=null;
@@ -290,7 +295,7 @@ function setFoodSourceTab(tab){
  const labelMap={
   history:'過去の履歴から検索',
   mymenu:'マイメニューから検索',
-  web:'Webデータベース（Open Food Facts）から検索'
+  web:'Webデータベース・Web記事から検索'
  };
  const placeholderMap={
   history:'商品名やJANコードで絞り込み',
@@ -312,6 +317,7 @@ function onFoodSearchInput(){
   const q=document.getElementById('foodSearch').value.trim();
   if(!q){
    webSearchResults=[];
+   webSearchSource='';
    renderFoodCandidates();
    return;
   }
@@ -353,7 +359,6 @@ function normalizeOffProduct(prod){
  const f=Number(n['fat_100g'])||0;
  const c=Number(n['carbohydrates_100g'])||0;
 
- // 内容量（例: "200 g", "430 ml"）が数値で取れれば初期分量に活用
  let defaultGrams=100;
  const qtyMatch=String(prod.quantity||'').match(/(\d+(?:\.\d+)?)\s*(g|ml|グラム)/i);
  if(qtyMatch){
@@ -370,8 +375,59 @@ function normalizeOffProduct(prod){
   f:Math.max(0,f),
   c:Math.max(0,c),
   defaultGrams,
-  isWeb:true
+  isWeb:true,
+  sourceType:'off'
  };
+}
+
+// Tavily (Cloudflare Workers) の検索結果アイテムから栄養値を抽出
+function normalizeTavilyItem(item,fallbackQuery){
+ if(!item)return null;
+ const rawTitle=String(item.title||'').trim();
+ const snippet=String(item.snippet||'').trim();
+ const combined=`${rawTitle} ${snippet}`
+  .replace(/[０-９．]/g,ch=>ch==='．'?'.':String.fromCharCode(ch.charCodeAt(0)-0xfee0))
+  .replace(/\s+/g,' ');
+
+ const kcalMatch=combined.match(/(\d+(?:\.\d+)?)\s*kcal/i);
+ const pMatch=combined.match(/(?:たんぱく質|タンパク(?:質)?|プロテイン|protein)\s*[:：／/]?\s*(\d+(?:\.\d+)?)\s*g/i);
+ const fMatch=combined.match(/(?:脂質|fat)\s*[:：／/]?\s*(\d+(?:\.\d+)?)\s*g/i);
+ const cMatch=combined.match(/(?:炭水化物|糖質|carbs?|carbohydrate)\s*[:：／/]?\s*(\d+(?:\.\d+)?)\s*g/i);
+
+ const kcal=kcalMatch?Number(kcalMatch[1]):(Number(item.kcalHint)||0);
+ const p=pMatch?Number(pMatch[1]):0;
+ const f=fMatch?Number(fMatch[1]):0;
+ const c=cMatch?Number(cMatch[1]):0;
+
+ // 記事タイトルからサイト名などの余分な後ろ側を軽く整形
+ const cleanName=(rawTitle.split(/\s*[|｜\-–—]\s*/)[0]||rawTitle||fallbackQuery).trim();
+
+ return {
+  id:`tavily_${crypto.randomUUID()}`,
+  name:cleanName||fallbackQuery,
+  fullTitle:rawTitle,
+  snippet,
+  url:String(item.url||'').trim(),
+  jan:'',
+  kcal:Math.max(0,kcal),
+  p:Math.max(0,p),
+  f:Math.max(0,f),
+  c:Math.max(0,c),
+  defaultGrams:100,
+  isWeb:true,
+  sourceType:'tavily'
+ };
+}
+
+async function fetchTavilyFallback(q){
+ if(!TAVILY_WORKER_URL||TAVILY_WORKER_URL.includes('あなたのWorker名')){
+  return [];
+ }
+ const res=await fetch(`${TAVILY_WORKER_URL}?q=${encodeURIComponent(q)}`);
+ if(!res.ok)throw new Error('Tavily HTTP '+res.status);
+ const data=await res.json();
+ const items=Array.isArray(data?.items)?data.items:[];
+ return items.map(it=>normalizeTavilyItem(it,q)).filter(Boolean);
 }
 
 async function searchWebProducts(){
@@ -382,16 +438,55 @@ async function searchWebProducts(){
   return;
  }
  el.innerHTML='<div class="empty">Webデータベースを検索中...</div>';
+ webSearchResults=[];
+ webSearchSource='';
+
+ let offList=[];
  try{
   const url=`https://jp.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`;
   const res=await fetch(url);
-  if(!res.ok)throw new Error('HTTP '+res.status);
-  const data=await res.json();
-  const products=Array.isArray(data.products)?data.products:[];
-  webSearchResults=products.map(normalizeOffProduct).filter(Boolean);
+  if(res.ok){
+   const data=await res.json();
+   const products=Array.isArray(data.products)?data.products:[];
+   offList=products.map(normalizeOffProduct).filter(Boolean);
+  }
+ }catch(_){}
+
+ if(offList.length>0){
+  webSearchResults=offList;
+  webSearchSource='off';
+  renderFoodCandidates();
+  return;
+ }
+
+ // Open Food Facts で 0 件だった場合、自動で Tavily (Cloudflare Workers) へフォールバック
+ el.innerHTML='<div class="empty">公開DBに該当なし。Web記事（Tavily）から栄養成分を検索中...</div>';
+ try{
+  const tavilyList=await fetchTavilyFallback(q);
+  webSearchResults=tavilyList;
+  webSearchSource='tavily';
   renderFoodCandidates();
  }catch(err){
-  el.innerHTML='<div class="empty">Web検索に失敗しました。通信状況を確認するか、「＋ 新規食品登録」から手動で登録してください。</div>';
+  el.innerHTML='<div class="empty">Web検索に失敗しました。通信状況やWorker URLを確認するか、「＋ 新規食品登録」から手動で登録してください。</div>';
+ }
+}
+
+async function forceSearchTavily(){
+ const el=document.getElementById('foodResults');
+ const q=(document.getElementById('foodSearch')?.value||'').trim();
+ if(!q)return;
+ if(!TAVILY_WORKER_URL||TAVILY_WORKER_URL.includes('あなたのWorker名')){
+  alert('index.html 内の TAVILY_WORKER_URL をご自身の Cloudflare Workers URL に設定してください。');
+  return;
+ }
+ el.innerHTML='<div class="empty">Web記事（Tavily）から栄養成分を検索中...</div>';
+ try{
+  const tavilyList=await fetchTavilyFallback(q);
+  webSearchResults=tavilyList;
+  webSearchSource='tavily';
+  renderFoodCandidates();
+ }catch(err){
+  el.innerHTML='<div class="empty">Web記事検索に失敗しました。通信状況やWorker URLを確認してください。</div>';
  }
 }
 
@@ -427,22 +522,44 @@ function renderFoodCandidates(){
 
  if(foodSourceTab==='web'){
   if(!q){
-   el.innerHTML='<div class="empty">商品名を入力すると、Web上の公開食品データ（Open Food Facts）から栄養成分を検索できます。</div>';
+   el.innerHTML='<div class="empty">商品名を入力すると、Open Food Facts と Web記事検索（Tavily）から栄養成分を探せます。</div>';
    return;
   }
   if(!webSearchResults.length){
-   el.innerHTML='<div class="empty">該当する商品が見つかりませんでした。別のキーワードに変えるか、「＋ 新規食品登録」から追加してください。</div>';
+   el.innerHTML='<div class="empty">該当する候補が見つかりませんでした。別のキーワードに変えるか、「＋ 新規食品登録」から追加してください。</div>';
    return;
   }
-  el.innerHTML=webSearchResults.map((f,idx)=>`
-   <div class="foodresult">
-    <div>
-     <b>${esc(f.name)}</b><span class="badge-web">Web</span>${f.jan?`<span class="badge-jan">JAN:${esc(f.jan)}</span>`:''}
-     <div class="small">${fmt(f.kcal)} kcal / 100g　P${fmt(f.p)} F${fmt(f.f)} C${fmt(f.c)}</div>
+  const noticeHtml=webSearchSource==='tavily'
+   ?'<div class="small" style="padding:4px 0 6px">※ Web記事からの抽出値です（1個/1食あたり表記の場合があるため選択後に確認・調整してください）</div>'
+   :'';
+  const rowsHtml=webSearchResults.map((f,idx)=>{
+   if(f.sourceType==='tavily'){
+    return `
+     <div class="foodresult">
+      <div style="min-width:0">
+       <b>${esc(f.name)}</b><span class="badge-tavily">Web記事</span>
+       <div class="small">抽出目安：${fmt(f.kcal)} kcal　P${fmt(f.p)} F${fmt(f.f)} C${fmt(f.c)}</div>
+       ${f.snippet?`<div class="small" style="margin-top:2px;line-height:1.35">${esc(f.snippet.slice(0,95))}${f.snippet.length>95?'…':''}</div>`:''}
+       ${f.url?`<div class="small" style="margin-top:3px"><a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">元ページを確認 ↗</a></div>`:''}
+      </div>
+      <button type="button" onclick="selectWebResult(${idx})">選択</button>
+     </div>
+    `;
+   }
+   return `
+    <div class="foodresult">
+     <div>
+      <b>${esc(f.name)}</b><span class="badge-web">DB</span>${f.jan?`<span class="badge-jan">JAN:${esc(f.jan)}</span>`:''}
+      <div class="small">${fmt(f.kcal)} kcal / 100g　P${fmt(f.p)} F${fmt(f.f)} C${fmt(f.c)}</div>
+     </div>
+     <button type="button" onclick="selectWebResult(${idx})">選択</button>
     </div>
-    <button type="button" onclick="selectWebResult(${idx})">選択</button>
-   </div>
-  `).join('');
+   `;
+  }).join('');
+  const extraSearchBtn=webSearchSource==='off'
+   ?'<div style="margin-top:8px;text-align:center"><button type="button" class="secondary" style="font-size:12px;padding:7px 12px" onclick="forceSearchTavily()">Web記事からさらに検索（Tavily）</button></div>'
+   :'';
+  el.innerHTML=noticeHtml+rowsHtml+extraSearchBtn;
   return;
  }
 
