@@ -254,13 +254,12 @@ label{font-size:11px;color:var(--muted);font-weight:650}.formgrid{display:grid;g
 <script>
 const KEY='bodylog-v1';
 // ★ ご自身の Cloudflare Workers URL に書き換えてください
-const TAVILY_WORKER_URL='https://bodylog-search.vanvan4200.workers.dev';
+const TAVILY_WORKER_URL='https://あなたのWorker名.サブドメイン.workers.dev';
 
 let db=loadDB(), selected=null, chartRange=90, chartSourceMs=[], chartPointCoords=[], selectedChartIndex=-1;
 let foodSourceTab='history'; // 'history' | 'mymenu' | 'web'
 let webSearchResults=[];
 let webSearchSource=''; // 'off' | 'tavily' | ''
-let webSearchTimer=null;
 let barcodeStream=null;
 let barcodeTimer=null;
 
@@ -300,7 +299,7 @@ function setFoodSourceTab(tab){
  const placeholderMap={
   history:'商品名やJANコードで絞り込み',
   mymenu:'マイメニュー名やJANコードで絞り込み',
-  web:'商品名を入力（例：ザバス、サラダチキン、オイコス）'
+  web:'商品名を入力して「検索」を押してください'
  };
  document.getElementById('foodSearchLabel').textContent=labelMap[tab];
  const searchInput=document.getElementById('foodSearch');
@@ -313,15 +312,12 @@ function setFoodSourceTab(tab){
 
 function onFoodSearchInput(){
  if(foodSourceTab==='web'){
-  clearTimeout(webSearchTimer);
   const q=document.getElementById('foodSearch').value.trim();
   if(!q){
    webSearchResults=[];
    webSearchSource='';
    renderFoodCandidates();
-   return;
   }
-  webSearchTimer=setTimeout(()=>searchWebProducts(),650);
   return;
  }
  renderFoodCandidates();
@@ -329,7 +325,6 @@ function onFoodSearchInput(){
 
 function triggerFoodSearch(){
  if(foodSourceTab==='web'){
-  clearTimeout(webSearchTimer);
   searchWebProducts();
  }else{
   renderFoodCandidates();
@@ -338,6 +333,16 @@ function triggerFoodSearch(){
 
 function renderFoodSearch(){
  renderFoodCandidates();
+}
+
+async function fetchWithTimeout(url,options={},timeoutMs=3500){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{
+  return await fetch(url,{...options,signal:controller.signal});
+ }finally{
+  clearTimeout(timer);
+ }
 }
 
 // Open Food Facts の product オブジェクトから 100g あたり栄養値を抽出
@@ -432,35 +437,45 @@ async function fetchTavilyFallback(q){
 
 async function searchWebProducts(){
  const el=document.getElementById('foodResults');
+ const searchBtn=document.getElementById('foodWebSearchBtn');
  const q=(document.getElementById('foodSearch')?.value||'').trim();
  if(!q){
   el.innerHTML='<div class="empty">検索キーワードを入力して「検索」を押してください。</div>';
   return;
  }
+ if(searchBtn)searchBtn.disabled=true;
  el.innerHTML='<div class="empty">Webデータベースを検索中...</div>';
  webSearchResults=[];
  webSearchSource='';
 
  let offList=[];
+ let offFailed=false;
  try{
   const url=`https://jp.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`;
-  const res=await fetch(url);
-  if(res.ok){
+  const res=await fetchWithTimeout(url,{},3500);
+  if(!res.ok){
+   offFailed=true;
+  }else{
    const data=await res.json();
    const products=Array.isArray(data.products)?data.products:[];
    offList=products.map(normalizeOffProduct).filter(Boolean);
   }
- }catch(_){}
+ }catch(_){
+  offFailed=true;
+ }
 
  if(offList.length>0){
   webSearchResults=offList;
   webSearchSource='off';
   renderFoodCandidates();
+  if(searchBtn)searchBtn.disabled=false;
   return;
  }
 
- // Open Food Facts で 0 件だった場合、自動で Tavily (Cloudflare Workers) へフォールバック
- el.innerHTML='<div class="empty">公開DBに該当なし。Web記事（Tavily）から栄養成分を検索中...</div>';
+ // Open Food Facts で 0 件または応答遅延だった場合、自動で Tavily (Cloudflare Workers) へフォールバック
+ el.innerHTML=offFailed
+  ?'<div class="empty">公開DBの応答が不安定なため、Web記事（Tavily）から検索中...</div>'
+  :'<div class="empty">公開DBに該当なし。Web記事（Tavily）から栄養成分を検索中...</div>';
  try{
   const tavilyList=await fetchTavilyFallback(q);
   webSearchResults=tavilyList;
@@ -468,17 +483,21 @@ async function searchWebProducts(){
   renderFoodCandidates();
  }catch(err){
   el.innerHTML='<div class="empty">Web検索に失敗しました。通信状況やWorker URLを確認するか、「＋ 新規食品登録」から手動で登録してください。</div>';
+ }finally{
+  if(searchBtn)searchBtn.disabled=false;
  }
 }
 
 async function forceSearchTavily(){
  const el=document.getElementById('foodResults');
+ const searchBtn=document.getElementById('foodWebSearchBtn');
  const q=(document.getElementById('foodSearch')?.value||'').trim();
  if(!q)return;
  if(!TAVILY_WORKER_URL||TAVILY_WORKER_URL.includes('あなたのWorker名')){
   alert('index.html 内の TAVILY_WORKER_URL をご自身の Cloudflare Workers URL に設定してください。');
   return;
  }
+ if(searchBtn)searchBtn.disabled=true;
  el.innerHTML='<div class="empty">Web記事（Tavily）から栄養成分を検索中...</div>';
  try{
   const tavilyList=await fetchTavilyFallback(q);
@@ -487,6 +506,8 @@ async function forceSearchTavily(){
   renderFoodCandidates();
  }catch(err){
   el.innerHTML='<div class="empty">Web記事検索に失敗しました。通信状況やWorker URLを確認してください。</div>';
+ }finally{
+  if(searchBtn)searchBtn.disabled=false;
  }
 }
 
@@ -522,11 +543,11 @@ function renderFoodCandidates(){
 
  if(foodSourceTab==='web'){
   if(!q){
-   el.innerHTML='<div class="empty">商品名を入力すると、Open Food Facts と Web記事検索（Tavily）から栄養成分を探せます。</div>';
+   el.innerHTML='<div class="empty">商品名を入力して「検索」を押すと、Open Food Facts と Web記事検索（Tavily）から栄養成分を探せます。</div>';
    return;
   }
   if(!webSearchResults.length){
-   el.innerHTML='<div class="empty">該当する候補が見つかりませんでした。別のキーワードに変えるか、「＋ 新規食品登録」から追加してください。</div>';
+   el.innerHTML='<div class="empty">「検索」ボタンを押して検索してください（該当がない場合はキーワードを変更してください）。</div>';
    return;
   }
   const noticeHtml=webSearchSource==='tavily'
@@ -682,6 +703,8 @@ function addMeal(){
  document.getElementById('selectedFood').textContent='「過去の履歴」「マイメニュー」「Web検索」から選択するか、バーコードを読み取ってください';
  document.getElementById('saveSelectedToMenuBtn')?.classList.add('hidden');
  document.getElementById('foodSearch').value='';
+ webSearchResults=[];
+ webSearchSource='';
  document.getElementById('foodGrams').value=100;
  document.getElementById('foodPreview').textContent='栄養値の目安がここに表示されます';
  renderAll();
@@ -805,7 +828,7 @@ async function lookupJanCode(rawCode){
  // 3. Open Food Facts API からJANコードで商品情報を取得
  document.getElementById('selectedFood').textContent=`JAN:${code} をWebデータベースから検索中...`;
  try{
-  const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`);
+  const res=await fetchWithTimeout(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_ja,generic_name,generic_name_ja,brands,quantity,nutriments`,{},4000);
   if(res.ok){
    const data=await res.json();
    if(data&&data.status===1&&data.product){
